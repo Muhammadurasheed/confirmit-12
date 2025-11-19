@@ -13,7 +13,7 @@ import imagehash
 from scipy import ndimage
 from scipy.ndimage import convolve, median_filter
 from skimage import img_as_float, feature, filters
-from skimage.measure import compare_ssim
+from skimage.metrics import structural_similarity
 import httpx
 
 logger = logging.getLogger(__name__)
