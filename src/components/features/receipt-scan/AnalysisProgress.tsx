@@ -30,6 +30,16 @@ export const AnalysisProgress = ({ progress, status, message }: AnalysisProgress
 
   const Icon = config.icon;
   const isLoading = Icon === Loader2;
+  
+  // Forensic-specific statuses
+  const forensicStatuses = [
+    'forensics_running', 
+    'pixel_analysis', 
+    'ela_analysis', 
+    'template_matching', 
+    'metadata_check'
+  ];
+  const isForensicActive = forensicStatuses.includes(status);
 
   return (
     <Card className="p-6 space-y-6 relative overflow-hidden">
@@ -74,7 +84,9 @@ export const AnalysisProgress = ({ progress, status, message }: AnalysisProgress
             <span className="font-medium">{progress}%</span>
           </div>
           <Progress value={progress} className="h-2" />
-          <p className="text-xs text-muted-foreground text-center">This usually takes 5-8 seconds</p>
+          <p className="text-xs text-muted-foreground text-center">
+            {isForensicActive ? 'Deep forensic analysis in progress...' : 'This usually takes 5-8 seconds'}
+          </p>
         </div>
 
         <EducationalTips />
@@ -89,26 +101,43 @@ export const AnalysisProgress = ({ progress, status, message }: AnalysisProgress
             >
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Multi-agent AI system analyzing your receipt...</span>
+                <span>
+                  {isForensicActive 
+                    ? '🔬 Multi-layer forensic detection active...' 
+                    : 'Multi-agent AI system analyzing your receipt...'}
+                </span>
               </div>
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="flex items-center gap-1">
-                  <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                  <div className={`h-1.5 w-1.5 rounded-full ${status === 'ocr_started' ? 'bg-blue-500 animate-pulse' : 'bg-blue-500/30'}`} />
                   <span>Vision Agent</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <div className="h-1.5 w-1.5 rounded-full bg-purple-500" />
+                  <div className={`h-1.5 w-1.5 rounded-full ${isForensicActive ? 'bg-purple-500 animate-pulse' : 'bg-purple-500/30'}`} />
                   <span>Forensic Agent</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                  <div className={`h-1.5 w-1.5 rounded-full bg-orange-500/30`} />
                   <span>Metadata Agent</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <div className="h-1.5 w-1.5 rounded-full bg-orange-500" />
+                  <div className={`h-1.5 w-1.5 rounded-full bg-green-500/30`} />
                   <span>Reputation Agent</span>
                 </div>
               </div>
+              {isForensicActive && (
+                <div className="mt-3 p-2 bg-purple-500/10 rounded text-xs space-y-1">
+                  <p className="font-medium text-purple-700 dark:text-purple-300">
+                    🔍 Active Forensic Layers:
+                  </p>
+                  <ul className="space-y-0.5 text-muted-foreground pl-4">
+                    <li>• Pixel-level manipulation detection</li>
+                    <li>• Error Level Analysis (ELA)</li>
+                    <li>• Clone region detection</li>
+                    <li>• Template matching verification</li>
+                  </ul>
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>

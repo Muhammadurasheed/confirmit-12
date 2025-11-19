@@ -25,6 +25,9 @@ interface ResultsDisplayProps {
     ocr_confidence: number;
     manipulation_score: number;
     metadata_flags: string[];
+    forensic_summary?: string;
+    techniques_detected?: string[];
+    authenticity_indicators?: string[];
   };
   merchant?: {
     name: string;
@@ -200,10 +203,19 @@ export const ResultsDisplay = ({
       <Accordion type="single" collapsible>
         <AccordionItem value="forensics">
           <AccordionTrigger className="text-base font-semibold">
-            Forensic Analysis Details
+            🔬 Forensic Analysis Details
           </AccordionTrigger>
           <AccordionContent>
-            <Card className="p-6 space-y-4">
+            <Card className="p-6 space-y-6">
+              {/* Summary */}
+              {forensicDetails.forensic_summary && (
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <p className="text-sm font-medium mb-2">Forensic Summary:</p>
+                  <p className="text-sm text-muted-foreground">{forensicDetails.forensic_summary}</p>
+                </div>
+              )}
+
+              {/* Key Metrics */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">OCR Confidence</p>
@@ -218,7 +230,42 @@ export const ResultsDisplay = ({
                   <p className="text-2xl font-bold">{safeMetadataFlags.length}</p>
                 </div>
               </div>
-              
+
+              {/* Authenticity Indicators */}
+              {forensicDetails.authenticity_indicators && forensicDetails.authenticity_indicators.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium mb-3 text-green-600 dark:text-green-400">
+                    ✓ Authenticity Indicators:
+                  </p>
+                  <ul className="space-y-2">
+                    {forensicDetails.authenticity_indicators.map((indicator, index) => (
+                      <li key={index} className="text-sm text-muted-foreground flex items-start gap-2">
+                        <span className="text-green-500 mt-0.5">✓</span>
+                        <span>{indicator}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Red Flags */}
+              {forensicDetails.techniques_detected && forensicDetails.techniques_detected.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium mb-3 text-red-600 dark:text-red-400">
+                    ⚠ Red Flags Detected:
+                  </p>
+                  <ul className="space-y-2">
+                    {forensicDetails.techniques_detected.map((technique, index) => (
+                      <li key={index} className="text-sm text-muted-foreground flex items-start gap-2">
+                        <span className="text-red-500 mt-0.5">⚠</span>
+                        <span>{technique}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Metadata Findings */}
               {safeMetadataFlags.length > 0 && (
                 <div>
                   <p className="text-sm font-medium mb-2">Metadata Findings:</p>

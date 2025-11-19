@@ -26,6 +26,12 @@ class ReceiptAnalysisOrchestrator:
         self.metadata_agent = metadata_agent
         self.reputation_agent = reputation_agent
         self.reasoning_agent = reasoning_agent
+        self.forensic_progress_log = []  # Track forensic agent progress
+        
+    def _forensic_progress_callback(self, progress_data):
+        """Callback to capture forensic agent progress"""
+        self.forensic_progress_log.append(progress_data)
+        logger.info(f"[Forensic Progress] {progress_data['stage']}: {progress_data['message']}")
 
     async def analyze_receipt(
         self, image_path: str, receipt_id: str
@@ -38,6 +44,7 @@ class ReceiptAnalysisOrchestrator:
         start_time = datetime.now()
         agent_results = {}
         agent_logs = []
+        self.forensic_progress_log = []  # Reset progress log
 
         try:
             # Run agents in parallel with timeouts
@@ -127,6 +134,12 @@ class ReceiptAnalysisOrchestrator:
                     "metadata_flags": agent_results.get("metadata", {}).get(
                         "flags", []
                     ),
+                    "forensic_progress": self.forensic_progress_log,  # Include detailed forensic steps
+                    "forensic_verdict": agent_results.get("forensic", {}).get("verdict", "unclear"),
+                    "forensic_summary": agent_results.get("forensic", {}).get("summary", ""),
+                    "techniques_detected": agent_results.get("forensic", {}).get("techniques_detected", []),
+                    "authenticity_indicators": agent_results.get("forensic", {}).get("authenticity_indicators", []),
+                    "technical_details": agent_results.get("forensic", {}).get("technical_details", {}),
                 },
                 "merchant": agent_results.get("reputation", {}).get("merchant"),
                 "agent_logs": agent_logs,
@@ -168,10 +181,13 @@ class ReceiptAnalysisOrchestrator:
             raise
 
     async def _run_forensic_agent(self, image_path: str, receipt_id: str) -> Dict:
-        """Run forensic analysis agent"""
+        """Run enhanced forensic analysis with progress tracking"""
         try:
-            logger.info(f"Running forensic agent for {receipt_id}")
-            result = await self.forensic_agent.analyze(image_path)
+            logger.info(f"Running enhanced forensic agent for {receipt_id}")
+            # Create new forensic agent instance with progress callback
+            from app.agents.forensic_agent import EnhancedForensicAgent
+            forensic = EnhancedForensicAgent(progress_callback=self._forensic_progress_callback)
+            result = await forensic.analyze(image_path)
             logger.info(f"Forensic agent completed for {receipt_id}")
             return result
         except Exception as e:

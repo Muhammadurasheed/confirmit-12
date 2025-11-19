@@ -6,7 +6,7 @@ import os
 import httpx
 from app.agents.orchestrator import ReceiptAnalysisOrchestrator
 from app.agents.vision_agent import VisionAgent
-from app.agents.forensic_agent import ForensicAgent
+from app.agents.forensic_agent import EnhancedForensicAgent
 from app.agents.metadata_agent import MetadataAgent
 from app.agents.reputation_agent import ReputationAgent
 from app.agents.reasoning_agent import ReasoningAgent
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 from app.config import settings
 gemini_api_key = settings.GEMINI_API_KEY
 vision_agent = VisionAgent(gemini_api_key) if gemini_api_key else None
-forensic_agent = ForensicAgent()
+forensic_agent = EnhancedForensicAgent()  # Now using enhanced forensics
 metadata_agent = MetadataAgent()
 reputation_agent = ReputationAgent()
 reasoning_agent = ReasoningAgent()
