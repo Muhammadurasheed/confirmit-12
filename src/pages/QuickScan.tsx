@@ -23,6 +23,7 @@ import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 const QuickScan = () => {
   const [anchorOnHedera, setAnchorOnHedera] = useState(false);
   const [uploadedReceiptId, setUploadedReceiptId] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const { user } = useAuth();
 
   const {
@@ -298,8 +299,10 @@ const QuickScan = () => {
                   
                   <CardContent>
                     <UploadZone
-                      onFileSelected={handleFileSelect}
+                      onFileSelected={(file) => setSelectedFile(file)}
+                      onScanClick={handleFileSelect}
                       disabled={isUploading || isAnalyzing}
+                      isScanning={isAnalyzing}
                     />
                   </CardContent>
                 </Card>

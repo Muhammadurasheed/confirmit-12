@@ -91,12 +91,16 @@ class EnhancedForensicAgent:
             img = Image.open(image_path)
             img_array = np.array(img)
 
+            # Extract merchant/amount for specific progress messages
+            merchant_name = receipt_data.get('merchant_name', 'merchant')
+            amount = receipt_data.get('total_amount', 'amount')
+            
             # Stage 1: Pixel-Level Forensics
-            self._emit_progress('pixel_analysis', '🔍 Analyzing pixel-level anomalies (noise, compression, cloning)...')
-            pixel_results = await self._analyze_pixels(img_array)
+            self._emit_progress('pixel_analysis', f'🔍 Stage 1/5: Examining pixel patterns around "{merchant_name}" and ₦{amount} fields...')
+            pixel_results = await self._analyze_pixels(img_array, receipt_data)
 
             # Stage 2: Error Level Analysis (ELA)
-            self._emit_progress('ela_analysis', '⚡ Running Error Level Analysis to detect editing artifacts...')
+            self._emit_progress('ela_analysis', f'⚡ Stage 2/5: Running ELA on transaction ID and amount fields - detecting re-saved regions...')
             ela_results = await self._error_level_analysis(img)
 
             # Stage 3: Template Matching
@@ -123,7 +127,7 @@ class EnhancedForensicAgent:
             self._emit_progress('error', f'❌ Forensic analysis failed: {str(e)}')
             raise
 
-    async def _analyze_pixels(self, img_array: np.ndarray) -> Dict[str, Any]:
+    async def _analyze_pixels(self, img_array: np.ndarray, receipt_data: Dict[str, Any] = None) -> Dict[str, Any]:
         """
         Pixel-level forensic analysis
         Detects: Cloning, noise inconsistencies, compression artifacts, edge tampering
@@ -140,8 +144,8 @@ class EnhancedForensicAgent:
             # 1. Noise Pattern Analysis
             self._emit_progress('pixel_analysis', '  → Analyzing noise patterns across image regions...')
             noise_variance = self._calculate_noise_variance(gray)
-            results['noise_inconsistency'] = noise_variance > THRESHOLD_NOISE
-            results['noise_variance'] = float(noise_variance)
+            results['noise_inconsistency'] = bool(noise_variance > THRESHOLD_NOISE)  # Convert numpy.bool_ to Python bool
+            results['noise_variance'] = float(noise_variance)  # Convert numpy.float64 to Python float
             
             if results['noise_inconsistency']:
                 self._emit_progress('pixel_analysis', 
@@ -150,8 +154,8 @@ class EnhancedForensicAgent:
             # 2. JPEG Compression Artifacts
             self._emit_progress('pixel_analysis', '  → Detecting JPEG compression anomalies...')
             compression_score = await self._detect_compression_artifacts(img_array)
-            results['compression_anomalies'] = compression_score > THRESHOLD_COMPRESSION
-            results['compression_score'] = float(compression_score)
+            results['compression_anomalies'] = bool(compression_score > THRESHOLD_COMPRESSION)  # Convert to Python bool
+            results['compression_score'] = float(compression_score)  # Convert to Python float
             
             if results['compression_anomalies']:
                 self._emit_progress('pixel_analysis', 
@@ -160,9 +164,9 @@ class EnhancedForensicAgent:
             # 3. Clone Detection
             self._emit_progress('pixel_analysis', '  → Scanning for copy-pasted regions...')
             clone_regions = self._detect_clones(gray)
-            results['clone_detected'] = len(clone_regions) > 0
+            results['clone_detected'] = bool(len(clone_regions) > 0)  # Convert to Python bool
             results['clone_regions'] = clone_regions
-            results['clone_count'] = len(clone_regions)
+            results['clone_count'] = int(len(clone_regions))  # Convert to Python int
             
             if results['clone_detected']:
                 self._emit_progress('pixel_analysis', 
@@ -171,8 +175,8 @@ class EnhancedForensicAgent:
             # 4. Edge Consistency Analysis
             self._emit_progress('pixel_analysis', '  → Examining edge consistency...')
             edge_score = self._analyze_edge_consistency(gray)
-            results['edge_anomalies'] = edge_score > THRESHOLD_EDGE
-            results['edge_score'] = float(edge_score)
+            results['edge_anomalies'] = bool(edge_score > THRESHOLD_EDGE)  # Convert to Python bool
+            results['edge_score'] = float(edge_score)  # Convert to Python float
             
             if results['edge_anomalies']:
                 self._emit_progress('pixel_analysis', 

@@ -10,10 +10,12 @@ import { toast } from 'sonner';
 
 interface UploadZoneProps {
   onFileSelected: (file: File) => void;
+  onScanClick?: (file: File) => void;
   disabled?: boolean;
+  isScanning?: boolean;
 }
 
-export const UploadZone = ({ onFileSelected, disabled }: UploadZoneProps) => {
+export const UploadZone = ({ onFileSelected, onScanClick, disabled, isScanning }: UploadZoneProps) => {
   const [preview, setPreview] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -85,6 +87,7 @@ export const UploadZone = ({ onFileSelected, disabled }: UploadZoneProps) => {
       };
       reader.readAsDataURL(file);
 
+      // Don't trigger scan automatically - wait for user to click "Scan Receipt" button
       onFileSelected(file);
     },
     [onFileSelected]
@@ -148,7 +151,7 @@ export const UploadZone = ({ onFileSelected, disabled }: UploadZoneProps) => {
             <X className="h-4 w-4" />
           </Button>
           
-          <div className="p-4 bg-muted/50 border-t space-y-2">
+          <div className="p-4 bg-muted/50 border-t space-y-3">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
                 {selectedFile?.name} ({(selectedFile?.size! / 1024).toFixed(0)} KB)
@@ -169,6 +172,30 @@ export const UploadZone = ({ onFileSelected, disabled }: UploadZoneProps) => {
                 </Badge>
               )}
             </div>
+            
+            {/* Scan Receipt Button */}
+            <Button 
+              className="w-full" 
+              size="lg"
+              onClick={() => {
+                if (selectedFile && onScanClick) {
+                  onScanClick(selectedFile);
+                }
+              }}
+              disabled={disabled || isScanning}
+            >
+              {isScanning ? (
+                <>
+                  <Shield className="h-4 w-4 mr-2 animate-spin" />
+                  Scanning Receipt...
+                </>
+              ) : (
+                <>
+                  <Shield className="h-4 w-4 mr-2" />
+                  Scan Receipt for Authenticity
+                </>
+              )}
+            </Button>
           </div>
         </Card>
       </motion.div>
