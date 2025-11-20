@@ -408,6 +408,15 @@ class EnhancedForensicAgent:
                 'confidence': 0.0,
                 'findings': []
             }
+            
+            # Template matching logic
+            await self._emit_progress('template_matching', '  ✓ Template analysis complete')
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"Template matching error: {str(e)}")
+            return results
     
     async def _generate_pixel_diff_map(self, original_gray: np.ndarray, compressed_gray: np.ndarray) -> Dict[str, Any]:
         """Generate pixel-level difference map showing exact changed pixels"""
@@ -487,15 +496,6 @@ class EnhancedForensicAgent:
                 },
                 'hotspots': []
             }
-            
-            # Template matching logic
-            await self._emit_progress('template_matching', '  ✓ Template analysis complete')
-            
-            return results
-            
-        except Exception as e:
-            logger.error(f"Template matching error: {str(e)}")
-            return results
 
     async def _deep_metadata_check(self, image_path: str) -> Dict[str, Any]:
         """Deep metadata forensics"""
