@@ -42,6 +42,25 @@ interface ForensicDetailsModalProps {
         heatmap?: number[][];
         image_dimensions?: { width: number; height: number };
         techniques?: string[];
+        pixel_diff?: {
+          diff_map: number[][];
+          dimensions: { width: number; height: number };
+          statistics: {
+            changed_pixels: number;
+            total_pixels: number;
+            change_percentage: number;
+            max_difference: number;
+            mean_difference: number;
+          };
+          hotspots: Array<{
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+            intensity: number;
+            changed_pixels: number;
+          }>;
+        };
       };
       pixel_results?: any;
       template_results?: any;
@@ -117,6 +136,7 @@ export const ForensicDetailsModal = ({
                 suspiciousRegions={elaAnalysis.suspicious_regions}
                 imageDimensions={elaAnalysis.image_dimensions}
                 statistics={elaAnalysis.statistics}
+                pixelDiff={elaAnalysis.pixel_diff}
               />
               
               {/* ELA Techniques Detected */}

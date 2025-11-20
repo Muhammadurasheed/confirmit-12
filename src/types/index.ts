@@ -49,6 +49,43 @@ export interface ForensicDetails {
   agent_logs?: AgentLog[]; // Backend snake_case
   forensic_progress?: any[]; // Detailed forensic analysis steps
   technical_details?: any; // ELA analysis, forensic data
+  heatmap?: number[][];
+  suspicious_regions?: Array<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    severity: number;
+    mean_error: number;
+    max_error: number;
+  }>;
+  image_dimensions?: {
+    width: number;
+    height: number;
+  };
+  mean_error?: number;
+  max_error?: number;
+  std_error?: number;
+  bright_pixel_ratio?: number;
+  pixel_diff?: {
+    diff_map: number[][];
+    dimensions: { width: number; height: number };
+    statistics: {
+      changed_pixels: number;
+      total_pixels: number;
+      change_percentage: number;
+      max_difference: number;
+      mean_difference: number;
+    };
+    hotspots: Array<{
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      intensity: number;
+      changed_pixels: number;
+    }>;
+  };
 }
 
 export interface AgentLog {
