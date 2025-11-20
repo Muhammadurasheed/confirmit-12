@@ -111,58 +111,83 @@ class ReasoningAgent:
         metadata: Dict,
         reputation: Dict,
     ) -> int:
-        """Calculate weighted trust score from all agents"""
+        """Calculate weighted trust score from all agents - STRICT SCORING"""
         
-        # Start with higher base score (75 instead of 70)
-        score = 75
+        # Start with neutral base score
+        score = 50
 
-        # Vision confidence (weight: 25%) - more weight on successful OCR
-        ocr_confidence = vision.get("confidence", 75) if vision else 75
-        # Be more generous with vision confidence
-        score += (ocr_confidence - 75) * 0.25
+        # CRITICAL: Vision confidence (weight: 40%) - this is most important
+        ocr_confidence = vision.get("confidence", 0) if vision else 0
+        ocr_text_length = len(vision.get("ocr_text", "")) if vision else 0
+        
+        # Harsh penalties for poor vision analysis
+        if ocr_confidence < 30:
+            score -= 30  # Severe penalty for failed OCR
+        elif ocr_confidence < 50:
+            score -= 15  # Moderate penalty for weak OCR
+        else:
+            score += (ocr_confidence - 50) * 0.6  # Reward good OCR
+        
+        # Penalty if almost no text extracted
+        if ocr_text_length < 20:
+            score -= 25  # Cannot trust a receipt with no extracted text
+        
+        # Visual anomalies (weight: 30%) - CRITICAL fraud indicators
+        visual_anomalies = vision.get("visual_anomalies", []) if vision else []
+        anomaly_count = len(visual_anomalies)
+        if anomaly_count > 0:
+            # Each anomaly is a major red flag
+            score -= anomaly_count * 8
+            logger.warning(f"⚠️ Visual anomalies detected: {anomaly_count} issues")
 
-        # Forensic analysis (weight: 25%) - reduced weight
+        # Forensic analysis (weight: 20%)
         manipulation_score = forensic.get("manipulation_score", 0) if forensic else 0
-        score -= manipulation_score * 0.25
+        if manipulation_score > 0:
+            score -= manipulation_score * 0.4
 
-        # Metadata (weight: 15%) - reduced weight, less harsh penalty
+        # Metadata (weight: 5%)
         metadata_flags = len(metadata.get("flags", [])) if metadata else 0
-        score -= metadata_flags * 3  # Reduced from 5 to 3
+        score -= metadata_flags * 5
 
-        # Reputation (weight: 35%)
+        # Reputation (weight: 5%)
         fraud_reports = reputation.get("total_fraud_reports", 0) if reputation else 0
-        score -= fraud_reports * 10
+        if fraud_reports > 0:
+            score -= fraud_reports * 15  # Major penalty for fraud history
 
-        # Bonus for verified merchant
+        # Bonus for verified merchant (only if other signals are positive)
         merchant = reputation.get("merchant") if reputation else None
-        if merchant and isinstance(merchant, dict) and merchant.get("verified"):
-            score += 15
-
-        # If we successfully extracted text, give a bonus
-        if vision and vision.get("ocr_text") and len(vision.get("ocr_text", "")) > 20:
-            score += 5  # Bonus for successful text extraction
+        if merchant and isinstance(merchant, dict) and merchant.get("verified") and score > 40:
+            score += 10
 
         # Clamp to 0-100
-        return max(0, min(100, int(score)))
+        final_score = max(0, min(100, int(score)))
+        
+        logger.info(f"📊 Trust Score Breakdown: Base=50, OCR={ocr_confidence}%, Anomalies={anomaly_count}, Final={final_score}")
+        
+        return final_score
 
     def _determine_verdict(
         self, trust_score: int, forensic: Dict, reputation: Dict
     ) -> str:
-        """Determine final verdict based on score and critical findings"""
+        """Determine final verdict based on score and critical findings - STRICT THRESHOLDS"""
         
-        # Critical red flags
+        # Critical red flags - instant fraud verdict
         fraud_reports = reputation.get("total_fraud_reports", 0) if reputation else 0
         manipulation_score = forensic.get("manipulation_score", 0) if forensic else 0
 
-        if fraud_reports >= 3 or manipulation_score >= 80:
+        if fraud_reports >= 2 or manipulation_score >= 70:
+            logger.warning(f"🚨 FRAUD VERDICT: fraud_reports={fraud_reports}, manipulation={manipulation_score}%")
             return "fraudulent"
-        elif trust_score >= 70:  # Lowered from 75
+        
+        # Strict thresholds
+        if trust_score >= 80:
             return "authentic"
-        elif trust_score >= 50:
+        elif trust_score >= 60:
             return "suspicious"
-        elif trust_score >= 25:  # Lowered from 30
+        elif trust_score >= 35:
             return "unclear"
         else:
+            logger.warning(f"🚨 FRAUDULENT: trust_score={trust_score} below threshold")
             return "fraudulent"
 
     def _compile_issues(
@@ -175,21 +200,32 @@ class ReasoningAgent:
         """Compile all detected issues"""
         issues = []
 
-        # Vision issues
+        # Vision issues - treat visual anomalies as HIGH severity
         visual_anomalies = vision.get("visual_anomalies", [])
         for anomaly in visual_anomalies:
+            # Visual anomalies detected by AI are RED FLAGS
             issues.append({
-                "type": "visual_anomaly",
-                "severity": "medium",
-                "description": anomaly,
+                "type": "visual_manipulation",
+                "severity": "high",
+                "description": f"🚨 {anomaly}",
             })
 
-        # Only flag truly poor quality (lowered threshold from 50 to 40)
-        if vision.get("confidence", 100) < 40:
+        # Flag poor OCR extraction
+        ocr_confidence = vision.get("confidence", 0)
+        if ocr_confidence < 50:
             issues.append({
-                "type": "poor_image_quality",
-                "severity": "medium",
-                "description": "Image quality is poor, reducing confidence",
+                "type": "ocr_failure",
+                "severity": "high",
+                "description": f"Failed to extract text reliably (confidence: {ocr_confidence}%) - possible tampering or poor image quality",
+            })
+        
+        # Flag if almost no text extracted
+        ocr_text_length = len(vision.get("ocr_text", ""))
+        if ocr_text_length < 20:
+            issues.append({
+                "type": "insufficient_data",
+                "severity": "high",
+                "description": f"Very little text extracted ({ocr_text_length} characters) - receipt may be fake or image corrupted",
             })
 
         # Forensic issues
@@ -224,19 +260,26 @@ class ReasoningAgent:
     def _generate_recommendation(
         self, verdict: str, trust_score: int, issues: List[Dict]
     ) -> str:
-        """Generate actionable recommendation"""
+        """Generate actionable recommendation - CLEAR AND DIRECT"""
+        
+        high_severity_issues = [i for i in issues if i.get("severity") == "high"]
         
         if verdict == "fraudulent":
-            return "🚨 DO NOT PROCEED - This receipt shows clear signs of fraud. Report this merchant immediately."
+            issue_summary = f" {len(high_severity_issues)} critical issues detected." if high_severity_issues else ""
+            return f"🚨 FRAUDULENT RECEIPT DETECTED - DO NOT TRUST.{issue_summary} Report this immediately and verify through official channels."
+        
         elif verdict == "suspicious":
-            return "⚠️ CAUTION ADVISED - This receipt has suspicious elements. Verify with merchant directly before proceeding."
+            issue_list = ", ".join([i["description"][:50] for i in high_severity_issues[:2]])
+            return f"⚠️ HIGHLY SUSPICIOUS - {issue_list}. Verify independently before accepting this receipt."
+        
         elif verdict == "unclear":
-            if len(issues) == 0:
-                return "ℹ️ UNCLEAR - Unable to fully verify. Request additional documentation."
+            if len(issues) >= 3:
+                return f"⚠️ CANNOT VERIFY - {len(issues)} issues detected including {len(high_severity_issues)} critical problems. Do not rely on this receipt."
             else:
-                return f"ℹ️ UNCLEAR - {len(issues)} issue(s) detected. Manual verification recommended."
+                return f"ℹ️ INSUFFICIENT DATA - Unable to fully verify authenticity ({len(issues)} issues). Request clearer documentation."
+        
         else:  # authentic
-            if trust_score >= 90:
-                return "✅ HIGHLY TRUSTWORTHY - This receipt appears completely authentic."
+            if trust_score >= 85:
+                return "✅ AUTHENTIC - This receipt appears completely legitimate. All verification checks passed."
             else:
-                return "✅ LIKELY AUTHENTIC - This receipt appears genuine with minor concerns."
+                return f"✅ LIKELY AUTHENTIC - Receipt appears genuine (score: {trust_score}/100). Minor concerns noted but overall trustworthy."
