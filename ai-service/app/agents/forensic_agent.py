@@ -243,8 +243,8 @@ class EnhancedForensicAgent:
     def _compare_blocks(self, block1: np.ndarray, block2: np.ndarray) -> float:
         """Compare two blocks using SSIM"""
         try:
-            # FIX: Add NaN/inf handling
-            sim = structural_similarity(block1.astype(float), block2.astype(float))
+            # FIX: Add data_range for floating point images
+            sim = structural_similarity(block1.astype(float), block2.astype(float), data_range=255.0)
             if np.isnan(sim) or np.isinf(sim):
                 return 0.0
             return float(sim)
