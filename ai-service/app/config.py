@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     CLOUDINARY_URL: str
 
     # Model Configuration
-    DEFAULT_MODEL: str = "gemini-2.0-flash-exp"
+    DEFAULT_MODEL: str = "gemini-1.5-flash"
     MAX_CONCURRENT_AGENTS: int = 5
     AGENT_TIMEOUT_SECONDS: int = 30
 
