@@ -32,9 +32,9 @@ class ReputationAgent:
             if progress:
                 await progress.emit(
                     agent="reputation",
-                    stage="reputation_check",
+                    stage="reputation_check_started",
                     message="Checking account numbers and merchant reputation",
-                    progress=75
+                    progress=72
                 )
 
             # Extract account numbers (Nigerian format: 10 digits)

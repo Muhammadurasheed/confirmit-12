@@ -15,6 +15,12 @@ interface ForensicDetailsModalProps {
     ocr_confidence: number;
     manipulation_score: number;
     metadata_flags: string[];
+    forensic_progress?: Array<{
+      stage: string;
+      message: string;
+      progress: number;
+      details?: Record<string, any>;
+    }>;
     technical_details?: {
       ela_analysis?: {
         manipulation_detected?: boolean;
@@ -227,36 +233,99 @@ export const ForensicDetailsModal = ({
           <TabsContent value="agents" className="space-y-6 mt-6">
             <Card>
               <CardContent className="pt-6">
-                <h4 className="font-semibold mb-3">
-                  <Bot className="h-4 w-4 inline mr-2" />
-                  Multi-Agent Analysis
-                </h4>
+            {/* Agent Execution Logs */}
+            <div className="mb-6">
+              <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                <Bot className="h-4 w-4" />
+                Agent Execution Summary
+              </h3>
+              <div className="space-y-3">
                 {forensicDetails.agent_logs && forensicDetails.agent_logs.length > 0 ? (
-                  <div className="space-y-3">
-                    {forensicDetails.agent_logs.map((log, idx) => (
-                      <div key={idx} className="border rounded p-3">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium capitalize">{log.agent} Agent</span>
+                  forensicDetails.agent_logs.map((log, idx) => (
+                    <Card key={idx}>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Bot className="h-4 w-4 text-primary" />
+                            <span className="font-medium capitalize">{log.agent} Agent</span>
+                          </div>
                           <Badge variant={log.status === 'success' ? 'default' : 'destructive'}>
                             {log.status}
                           </Badge>
                         </div>
-                        {log.confidence !== undefined && (
-                          <p className="text-sm text-muted-foreground mt-1">
-                            Confidence: {log.confidence}%
-                          </p>
-                        )}
-                        {log.manipulation_score !== undefined && (
-                          <p className="text-sm text-muted-foreground mt-1">
-                            Manipulation Score: {log.manipulation_score}%
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                        <div className="space-y-1 text-sm text-muted-foreground">
+                          {log.confidence !== undefined && (
+                            <div className="flex justify-between">
+                              <span>Confidence:</span>
+                              <span className="font-medium">{log.confidence}%</span>
+                            </div>
+                          )}
+                          {log.manipulation_score !== undefined && (
+                            <div className="flex justify-between">
+                              <span>Manipulation Score:</span>
+                              <span className="font-medium">{log.manipulation_score}%</span>
+                            </div>
+                          )}
+                          {log.flags !== undefined && (
+                            <div className="flex justify-between">
+                              <span>Flags Detected:</span>
+                              <span className="font-medium">{log.flags}</span>
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
                 ) : (
-                  <p className="text-sm text-muted-foreground">Agent logs not available</p>
+                  <Card>
+                    <CardContent className="p-8 text-center text-muted-foreground">
+                      <Bot className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p>No agent execution logs available</p>
+                    </CardContent>
+                  </Card>
                 )}
+              </div>
+            </div>
+
+            {/* Forensic Progress Steps */}
+            {forensicDetails.forensic_progress && forensicDetails.forensic_progress.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <Shield className="h-4 w-4" />
+                  Forensic Analysis Steps
+                </h3>
+                <div className="space-y-2">
+                  {forensicDetails.forensic_progress.map((step: any, idx: number) => (
+                    <Card key={idx} className="border-l-4 border-l-purple-500">
+                      <CardContent className="p-3">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xs font-semibold uppercase text-purple-600 dark:text-purple-400">
+                                {step.stage?.replace(/_/g, ' ')}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {step.progress}%
+                              </span>
+                            </div>
+                            <p className="text-sm">{step.message}</p>
+                            {step.details && Object.keys(step.details).length > 0 && (
+                              <div className="mt-2 flex flex-wrap gap-1">
+                                {Object.entries(step.details).map(([key, value]) => (
+                                  <span key={key} className="text-xs px-2 py-0.5 rounded bg-muted">
+                                    {key}: <span className="font-medium">{String(value)}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
               </CardContent>
             </Card>
           </TabsContent>

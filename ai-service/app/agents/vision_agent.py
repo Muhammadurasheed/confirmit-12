@@ -35,20 +35,28 @@ class VisionAgent:
             - receipt_date: Detected date
         """
         try:
-            logger.info(f"Vision agent analyzing: {image_path}")
+            logger.info(f"🔍 Vision agent analyzing: {image_path}")
             
             if progress:
                 await progress.emit(
                     agent="vision",
                     stage="ocr_started",
                     message="Extracting text from receipt using AI OCR",
-                    progress=25
+                    progress=15
                 )
 
             # Load image
             img = Image.open(image_path)
             
             # STAGE 1: Try Tesseract OCR first (FREE, fast, local)
+            if progress:
+                await progress.emit(
+                    agent="vision",
+                    stage="tesseract_ocr",
+                    message="Running Tesseract OCR on receipt image",
+                    progress=20
+                )
+            
             tesseract_result = await self._analyze_with_tesseract(img)
             
             # If Tesseract confidence is good, use it

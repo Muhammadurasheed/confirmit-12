@@ -8,7 +8,18 @@ interface AnalysisProgressProps {
   progress: number;
   status: string;
   message: string;
+  currentAgent?: string;
+  agentDetails?: Record<string, any>;
 }
+
+const agentConfig = {
+  orchestrator: { label: 'Orchestrator', color: 'text-blue-500', bg: 'bg-blue-500/10' },
+  vision: { label: 'Vision Agent', color: 'text-green-500', bg: 'bg-green-500/10' },
+  forensic: { label: 'Forensic Agent', color: 'text-purple-500', bg: 'bg-purple-500/10' },
+  metadata: { label: 'Metadata Agent', color: 'text-orange-500', bg: 'bg-orange-500/10' },
+  reputation: { label: 'Reputation Agent', color: 'text-cyan-500', bg: 'bg-cyan-500/10' },
+  reasoning: { label: 'Reasoning Agent', color: 'text-pink-500', bg: 'bg-pink-500/10' },
+};
 
 const statusConfig = {
   upload_complete: { label: 'Upload Complete', icon: Check, color: 'text-green-500' },
@@ -21,7 +32,7 @@ const statusConfig = {
   failed: { label: 'Verification Failed', icon: AlertCircle, color: 'text-red-500' },
 };
 
-export const AnalysisProgress = ({ progress, status, message }: AnalysisProgressProps) => {
+export const AnalysisProgress = ({ progress, status, message, currentAgent, agentDetails }: AnalysisProgressProps) => {
   const config = statusConfig[status as keyof typeof statusConfig] || {
     label: 'Processing',
     icon: Loader2,
@@ -30,6 +41,9 @@ export const AnalysisProgress = ({ progress, status, message }: AnalysisProgress
 
   const Icon = config.icon;
   const isLoading = Icon === Loader2;
+  
+  // Get current agent info
+  const agentInfo = currentAgent ? agentConfig[currentAgent as keyof typeof agentConfig] : null;
   
   // Forensic-specific statuses
   const forensicStatuses = [
@@ -64,6 +78,18 @@ export const AnalysisProgress = ({ progress, status, message }: AnalysisProgress
       </div>
 
       <div className="relative z-10 space-y-6">
+        {/* Agent Status Badge */}
+        {agentInfo && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full ${agentInfo.bg} border border-border/50`}
+          >
+            <div className={`h-2 w-2 rounded-full ${agentInfo.color} animate-pulse`} />
+            <span className={`text-sm font-medium ${agentInfo.color}`}>{agentInfo.label}</span>
+          </motion.div>
+        )}
+        
         <div className="flex items-center gap-4">
           <motion.div
             animate={isLoading ? { scale: [1, 1.1, 1] } : {}}
@@ -75,6 +101,17 @@ export const AnalysisProgress = ({ progress, status, message }: AnalysisProgress
           <div className="flex-1">
             <h3 className="font-semibold text-lg">{config.label}</h3>
             <p className="text-sm text-muted-foreground">{message}</p>
+            
+            {/* Agent Details */}
+            {agentDetails && Object.keys(agentDetails).length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {Object.entries(agentDetails).map(([key, value]) => (
+                  <span key={key} className="text-xs px-2 py-0.5 rounded bg-muted">
+                    {key}: <span className="font-medium">{String(value)}</span>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

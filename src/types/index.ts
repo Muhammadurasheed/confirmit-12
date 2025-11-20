@@ -17,6 +17,8 @@ export interface Receipt {
   hederaAnchor?: HederaAnchor;
   status: AnalysisStatus;
   processingTime?: number;
+  currentAgent?: string; // Current agent processing the receipt
+  agentDetails?: Record<string, any>; // Agent-specific details (merchant, amount, etc.)
 }
 
 export interface AnalysisResult {
@@ -45,6 +47,7 @@ export interface ForensicDetails {
   metadata_flags?: string[]; // Backend snake_case
   agentLogs?: AgentLog[];
   agent_logs?: AgentLog[]; // Backend snake_case
+  forensic_progress?: any[]; // Detailed forensic analysis steps
   technical_details?: any; // ELA analysis, forensic data
 }
 
