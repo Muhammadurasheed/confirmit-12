@@ -6,6 +6,7 @@ services:
     env: python
     plan: free
     buildCommand: |
+      apt-get update && apt-get install -y tesseract-ocr tesseract-ocr-eng libtesseract-dev
       pip install --upgrade pip setuptools wheel
       pip install --no-cache-dir --prefer-binary -r requirements.txt
     startCommand: |
