@@ -307,6 +307,11 @@ class EnhancedForensicAgent:
             # Generate heatmap
             heatmap = await self._generate_ela_heatmap(gray_ela)
             
+            # Generate pixel-level difference map
+            original_gray = np.array(img.convert('L'))
+            compressed_gray = np.array(compressed.convert('L'))
+            pixel_diff = await self._generate_pixel_diff_map(original_gray, compressed_gray)
+            
             # Detect suspicious regions
             suspicious_regions = []
             grid_size = 8
@@ -359,7 +364,8 @@ class EnhancedForensicAgent:
                 },
                 'suspicious_regions': suspicious_regions,
                 'heatmap': heatmap,
-                'image_dimensions': {'width': w, 'height': h}
+                'image_dimensions': {'width': w, 'height': h},
+                'pixel_diff': pixel_diff
             }
             
         except Exception as e:
@@ -401,6 +407,85 @@ class EnhancedForensicAgent:
                 'template_name': None,
                 'confidence': 0.0,
                 'findings': []
+            }
+    
+    async def _generate_pixel_diff_map(self, original_gray: np.ndarray, compressed_gray: np.ndarray) -> Dict[str, Any]:
+        """Generate pixel-level difference map showing exact changed pixels"""
+        try:
+            # Calculate absolute pixel difference
+            pixel_diff = np.abs(original_gray.astype(float) - compressed_gray.astype(float))
+            
+            # Normalize to 0-255 range
+            if pixel_diff.max() > 0:
+                pixel_diff_normalized = (pixel_diff / pixel_diff.max() * 255).astype(np.uint8)
+            else:
+                pixel_diff_normalized = pixel_diff.astype(np.uint8)
+            
+            # Find changed pixels (threshold at 10 for noise reduction)
+            changed_pixels = pixel_diff > 10
+            num_changed = int(np.sum(changed_pixels))
+            total_pixels = original_gray.size
+            change_percentage = (num_changed / total_pixels) * 100
+            
+            # Downsample to manageable size (max 512x512)
+            height, width = pixel_diff_normalized.shape
+            max_size = 512
+            if height > max_size or width > max_size:
+                scale = min(max_size / height, max_size / width)
+                new_height = int(height * scale)
+                new_width = int(width * scale)
+                pixel_diff_normalized = cv2.resize(pixel_diff_normalized, (new_width, new_height))
+            
+            # Convert to list for JSON serialization
+            diff_map = pixel_diff_normalized.tolist()
+            
+            # Identify hotspot regions (areas with concentrated changes)
+            hotspots = []
+            kernel_size = 32
+            stride = 16
+            for y in range(0, height - kernel_size, stride):
+                for x in range(0, width - kernel_size, stride):
+                    region = pixel_diff[y:y+kernel_size, x:x+kernel_size]
+                    region_changed = np.sum(region > 10)
+                    if region_changed > (kernel_size * kernel_size * 0.15):  # >15% changed
+                        hotspots.append({
+                            'x': int(x),
+                            'y': int(y),
+                            'width': kernel_size,
+                            'height': kernel_size,
+                            'intensity': float(np.mean(region)),
+                            'changed_pixels': int(region_changed)
+                        })
+            
+            return {
+                'diff_map': diff_map,
+                'dimensions': {
+                    'width': int(pixel_diff_normalized.shape[1]),
+                    'height': int(pixel_diff_normalized.shape[0])
+                },
+                'statistics': {
+                    'changed_pixels': num_changed,
+                    'total_pixels': total_pixels,
+                    'change_percentage': float(change_percentage),
+                    'max_difference': float(pixel_diff.max()),
+                    'mean_difference': float(pixel_diff.mean())
+                },
+                'hotspots': hotspots[:20]  # Limit to top 20 hotspots
+            }
+            
+        except Exception as e:
+            logger.error(f"Pixel diff map generation failed: {e}")
+            return {
+                'diff_map': [],
+                'dimensions': {'width': 0, 'height': 0},
+                'statistics': {
+                    'changed_pixels': 0,
+                    'total_pixels': 0,
+                    'change_percentage': 0.0,
+                    'max_difference': 0.0,
+                    'mean_difference': 0.0
+                },
+                'hotspots': []
             }
             
             # Template matching logic
