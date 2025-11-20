@@ -20,7 +20,7 @@ class VisionAgent:
         # Use gemini-1.5-flash - more stable, better quotas than experimental model
         self.model = genai.GenerativeModel("gemini-1.5-flash")
 
-    async def analyze(self, image_path: str) -> Dict[str, Any]:
+    async def analyze(self, image_path: str, progress=None) -> Dict[str, Any]:
         """
         Analyze receipt image using Tesseract OCR (primary) + Gemini Vision (fallback)
 
@@ -34,6 +34,14 @@ class VisionAgent:
         """
         try:
             logger.info(f"Vision agent analyzing: {image_path}")
+            
+            if progress:
+                await progress.emit(
+                    agent="vision",
+                    stage="ocr_started",
+                    message="Extracting text from receipt using AI OCR",
+                    progress=25
+                )
 
             # Load image
             img = Image.open(image_path)
@@ -44,11 +52,35 @@ class VisionAgent:
             # If Tesseract confidence is good, use it
             if tesseract_result['confidence'] >= 70:
                 logger.info(f"✅ Tesseract OCR successful with {tesseract_result['confidence']}% confidence")
+                
+                if progress:
+                    await progress.emit(
+                        agent="vision",
+                        stage="ocr_complete",
+                        message=f"Extracted text from {tesseract_result.get('merchant_name', 'receipt')}",
+                        progress=35,
+                        details={
+                            'merchant': tesseract_result.get('merchant_name'),
+                            'amount': tesseract_result.get('total_amount'),
+                            'confidence': tesseract_result['confidence']
+                        }
+                    )
+                
                 return tesseract_result
             
             # STAGE 2: Fallback to Gemini if Tesseract confidence is low
             logger.warning(f"⚠️ Tesseract confidence low ({tesseract_result['confidence']}%), falling back to Gemini")
-            return await self._analyze_with_gemini(img, image_path)
+            
+            if progress:
+                await progress.emit(
+                    agent="vision",
+                    stage="gemini_fallback",
+                    message="Using advanced AI vision for better accuracy",
+                    progress=30
+                )
+            
+            gemini_result = await self._analyze_with_gemini(img, progress)
+            return gemini_result
             
         except Exception as e:
             logger.error(f"Vision agent error: {str(e)}")
@@ -239,6 +271,21 @@ IMPORTANT:
 
                 logger.info(f"Gemini Vision completed with confidence: {result.get('confidence')}")
                 result['ocr_method'] = 'gemini'
+                
+                if progress:
+                    await progress.emit(
+                        agent="vision",
+                        stage="ocr_complete",
+                        message=f"Found {result.get('merchant_name', 'receipt')} - ₦{result.get('total_amount', 'N/A')}",
+                        progress=35,
+                        details={
+                            'merchant': result.get('merchant_name'),
+                            'amount': result.get('total_amount'),
+                            'items_count': len(result.get('items', [])),
+                            'confidence': result.get('confidence')
+                        }
+                    )
+                
                 return result
                 
             except Exception as e:

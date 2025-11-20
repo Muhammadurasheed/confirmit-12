@@ -24,7 +24,7 @@ class MetadataAgent:
             "snapseed",
         ]
 
-    async def analyze(self, image_path: str) -> Dict[str, Any]:
+    async def analyze(self, image_path: str, progress=None) -> Dict[str, Any]:
         """
         Extract and analyze metadata
 
@@ -36,6 +36,14 @@ class MetadataAgent:
         """
         try:
             logger.info(f"Metadata agent analyzing: {image_path}")
+            
+            if progress:
+                await progress.emit(
+                    agent="metadata",
+                    stage="metadata_extraction",
+                    message="Analyzing image metadata and EXIF data",
+                    progress=45
+                )
 
             # Load image
             img = Image.open(image_path)
@@ -81,6 +89,20 @@ class MetadataAgent:
             logger.info(
                 f"Metadata agent completed. Flags: {len(flags)}"
             )
+            
+            if progress:
+                message = f"Found {len(flags)} metadata flags" if flags else "Clean metadata - no editing detected"
+                await progress.emit(
+                    agent="metadata",
+                    stage="metadata_complete",
+                    message=message,
+                    progress=50,
+                    details={
+                        'flags_count': len(flags),
+                        'editing_software': software_detected
+                    }
+                )
+            
             return result
 
         except Exception as e:
