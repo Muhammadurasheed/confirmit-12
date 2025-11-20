@@ -75,17 +75,31 @@ class ProgressEmitter:
             details: Optional dict with specific details (e.g., extracted data)
         """
         try:
+            # Sanitize details BEFORE creating progress_update to avoid nested issues
+            sanitized_details = None
+            if details:
+                try:
+                    sanitized_details = _sanitize_for_firebase(details)
+                    # Double check - if still complex, convert to simple key-value strings
+                    if isinstance(sanitized_details, dict):
+                        sanitized_details = {
+                            k: str(v) if not isinstance(v, (str, int, float, bool)) else v
+                            for k, v in sanitized_details.items()
+                        }
+                except Exception as sanitize_error:
+                    logger.warning(f"⚠️ Failed to sanitize details: {sanitize_error}, converting to string")
+                    sanitized_details = {'raw': str(details)[:200]}  # Truncate for safety
+            
             progress_update = {
-                'agent': agent,
-                'stage': stage,
-                'message': message,
-                'progress': progress,
+                'agent': str(agent),
+                'stage': str(stage),
+                'message': str(message),
+                'progress': int(progress),
                 'timestamp': datetime.utcnow().isoformat(),
             }
             
-            if details:
-                # Sanitize details to ensure Firebase compatibility
-                progress_update['details'] = _sanitize_for_firebase(details)
+            if sanitized_details:
+                progress_update['details'] = sanitized_details
             
             # Update Firebase with latest progress
             self.progress_ref.update({
@@ -96,5 +110,5 @@ class ProgressEmitter:
             logger.info(f"📡 [{self.receipt_id}] {agent}: {message} ({progress}%)")
             
         except Exception as e:
-            logger.error(f"❌ Failed to emit progress: {str(e)}")
-            # Don't fail the analysis if progress emission fails
+            logger.error(f"❌ Failed to emit progress for {self.receipt_id}: {str(e)}", exc_info=True)
+            # Don't fail the analysis if progress emission fails - just log it

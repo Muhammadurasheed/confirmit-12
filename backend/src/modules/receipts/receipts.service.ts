@@ -135,7 +135,7 @@ export class ReceiptsService {
 
       this.receiptsGateway.emitProgress(receiptId, 80, 'analysis_complete', 'Analysis complete!');
 
-      // Store results
+      // Store complete results with ALL data from AI service
       await receiptRef.update({
         analysis: {
           trust_score: analysisResult.trust_score,
@@ -146,9 +146,15 @@ export class ReceiptsService {
             ocr_confidence: analysisResult.forensic_details?.ocr_confidence || 0,
             manipulation_score: analysisResult.forensic_details?.manipulation_score || 0,
             metadata_flags: analysisResult.forensic_details?.metadata_flags || [],
-            agent_logs: analysisResult.agent_logs || [],
+            forensic_summary: analysisResult.forensic_details?.forensic_summary,
+            techniques_detected: analysisResult.forensic_details?.techniques_detected || [],
+            authenticity_indicators: analysisResult.forensic_details?.authenticity_indicators || [],
+            forensic_progress: analysisResult.forensic_details?.forensic_progress || [],
+            technical_details: analysisResult.forensic_details?.technical_details || {},
           },
           merchant: analysisResult.merchant || null,
+          agent_logs: analysisResult.agent_logs || [],
+          ocr_text: analysisResult.ocr_text || null, // Include OCR text
         },
         processing_time: Date.now() - startTime,
         status: 'completed',

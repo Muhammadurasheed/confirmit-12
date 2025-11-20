@@ -30,6 +30,8 @@ export interface AnalysisResult {
   forensicDetails?: ForensicDetails;
   forensic_details?: ForensicDetails; // Backend snake_case
   merchant?: MerchantInfo;
+  ocr_text?: string; // OCR extracted text
+  agent_logs?: AgentLog[]; // Agent execution logs
 }
 
 export interface Issue {
@@ -47,6 +49,9 @@ export interface ForensicDetails {
   metadata_flags?: string[]; // Backend snake_case
   agentLogs?: AgentLog[];
   agent_logs?: AgentLog[]; // Backend snake_case
+  forensic_summary?: string; // Summary of forensic analysis
+  techniques_detected?: string[]; // Red flags detected
+  authenticity_indicators?: string[]; // Authenticity markers
   forensic_progress?: any[]; // Detailed forensic analysis steps
   technical_details?: any; // ELA analysis, forensic data
   heatmap?: number[][];

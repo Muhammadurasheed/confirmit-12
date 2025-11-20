@@ -329,6 +329,8 @@ const QuickScan = () => {
                   progress={analysisProgress}
                   status={analysisStatus}
                   message={`Receipt ID: ${currentReceipt?.receiptId || ''}`}
+                  currentAgent={currentReceipt?.currentAgent}
+                  agentDetails={currentReceipt?.agentDetails}
                 />
               </motion.div>
             )}
@@ -360,6 +362,7 @@ const QuickScan = () => {
                 <ResultsDisplay
                   receiptId={currentReceipt.receiptId}
                   receiptImageUrl={currentReceipt.storagePath}
+                  ocrText={results.ocr_text || ''} // Pass OCR text
                   trustScore={(results.trust_score || results.trustScore || 0) as number}
                   verdict={(results.verdict || 'unclear') as any}
                   issues={results.issues || []}
@@ -368,7 +371,12 @@ const QuickScan = () => {
                     ocr_confidence: (results.forensic_details?.ocr_confidence || results.forensicDetails?.ocr_confidence || results.forensicDetails?.ocrConfidence || 0) as number,
                     manipulation_score: (results.forensic_details?.manipulation_score || results.forensicDetails?.manipulation_score || results.forensicDetails?.manipulationScore || 0) as number,
                     metadata_flags: (results.forensic_details?.metadata_flags || results.forensicDetails?.metadata_flags || results.forensicDetails?.metadataFlags || []) as string[],
+                    forensic_summary: results.forensic_details?.forensic_summary || results.forensicDetails?.forensic_summary,
+                    techniques_detected: results.forensic_details?.techniques_detected || results.forensicDetails?.techniques_detected || [],
+                    authenticity_indicators: results.forensic_details?.authenticity_indicators || results.forensicDetails?.authenticity_indicators || [],
                     technical_details: results.forensic_details?.technical_details || results.forensicDetails?.technical_details,
+                    forensic_progress: results.forensic_details?.forensic_progress || results.forensicDetails?.forensic_progress || [],
+                    agent_logs: results.agent_logs || results.forensic_details?.agent_logs || [],
                   }}
                   merchant={results.merchant ? {
                     name: results.merchant.name,

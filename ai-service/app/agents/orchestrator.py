@@ -151,13 +151,14 @@ class ReceiptAnalysisOrchestrator:
             # Calculate processing time
             processing_time = (datetime.now() - start_time).total_seconds()
 
-            # Compile final response
-            return {
+            # Compile final response with ALL data needed by frontend
+            final_response = {
                 "receipt_id": receipt_id,
                 "trust_score": final_analysis.get("trust_score", 50),
                 "verdict": final_analysis.get("verdict", "unclear"),
                 "issues": final_analysis.get("issues", []),
                 "recommendation": final_analysis.get("recommendation", ""),
+                "ocr_text": agent_results.get("vision", {}).get("ocr_text", ""),  # Critical: Include OCR text
                 "forensic_details": {
                     "ocr_confidence": agent_results.get("vision", {}).get(
                         "confidence", 0
@@ -168,7 +169,7 @@ class ReceiptAnalysisOrchestrator:
                     "metadata_flags": agent_results.get("metadata", {}).get(
                         "flags", []
                     ),
-                    "forensic_progress": self.forensic_progress_log,  # Include detailed forensic steps
+                    "forensic_progress": self.forensic_progress_log,  # Detailed forensic steps
                     "forensic_verdict": agent_results.get("forensic", {}).get("verdict", "unclear"),
                     "forensic_summary": agent_results.get("forensic", {}).get("summary", ""),
                     "techniques_detected": agent_results.get("forensic", {}).get("techniques_detected", []),
@@ -176,9 +177,19 @@ class ReceiptAnalysisOrchestrator:
                     "technical_details": agent_results.get("forensic", {}).get("technical_details", {}),
                 },
                 "merchant": agent_results.get("reputation", {}).get("merchant"),
-                "agent_logs": agent_logs,
+                "agent_logs": agent_logs,  # Critical: Agent execution logs
                 "processing_time_seconds": processing_time,
             }
+            
+            # Store complete results to Firebase
+            await progress.emit(
+                agent="orchestrator",
+                stage="storing_results",
+                message="Saving analysis results",
+                progress=95
+            )
+            
+            return final_response
 
         except Exception as e:
             logger.error(f"Orchestrator error for receipt {receipt_id}: {str(e)}")

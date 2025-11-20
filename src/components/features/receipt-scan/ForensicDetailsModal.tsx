@@ -211,13 +211,20 @@ export const ForensicDetailsModal = ({
                   <Eye className="h-4 w-4 inline mr-2" />
                   Extracted Text
                 </h4>
-                <div className="bg-muted p-4 rounded-lg">
-                  <pre className="text-sm whitespace-pre-wrap font-mono">
-                    {ocrText || 'No OCR text available'}
-                  </pre>
-                </div>
+                {ocrText && ocrText.trim() ? (
+                  <div className="bg-muted p-4 rounded-lg">
+                    <pre className="text-sm whitespace-pre-wrap font-mono max-h-60 overflow-y-auto">
+                      {ocrText}
+                    </pre>
+                  </div>
+                ) : (
+                  <div className="bg-muted/50 p-8 rounded-lg text-center">
+                    <Eye className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm text-muted-foreground">No OCR text extracted from receipt</p>
+                  </div>
+                )}
                 <p className="text-xs text-muted-foreground mt-2">
-                  Confidence: {forensicDetails.ocr_confidence}%
+                  OCR Confidence: {forensicDetails.ocr_confidence}%
                 </p>
               </CardContent>
             </Card>
