@@ -13,6 +13,7 @@ import HederaBadge from '@/components/shared/HederaBadge';
 
 interface ResultsDisplayProps {
   receiptId: string;
+  receiptImageUrl?: string;
   trustScore: number;
   verdict: 'authentic' | 'suspicious' | 'fraudulent' | 'unclear';
   issues: Array<{
@@ -28,6 +29,7 @@ interface ResultsDisplayProps {
     forensic_summary?: string;
     techniques_detected?: string[];
     authenticity_indicators?: string[];
+    technical_details?: any;
   };
   merchant?: {
     name: string;
@@ -70,6 +72,7 @@ const verdictConfig = {
 
 export const ResultsDisplay = ({
   receiptId,
+  receiptImageUrl,
   trustScore,
   verdict,
   issues = [],
@@ -319,7 +322,9 @@ export const ResultsDisplay = ({
       <ForensicDetailsModal
         open={showForensicModal}
         onOpenChange={setShowForensicModal}
-        forensicDetails={forensicDetails}
+        receiptId={receiptId}
+        receiptImageUrl={receiptImageUrl}
+        forensicDetails={safeForensicDetails}
       />
       <HederaAnchorModal
         open={showHederaModal}

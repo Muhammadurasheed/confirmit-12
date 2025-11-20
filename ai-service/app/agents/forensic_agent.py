@@ -337,6 +337,142 @@ class EnhancedForensicAgent:
 
     async def _error_level_analysis(self, img: Image.Image) -> Dict[str, Any]:
         """
+        Error Level Analysis (ELA) - Primary fraud detection technique
+        Detects JPEG manipulation by analyzing compression artifacts
+        Returns heatmap data for frontend visualization
+        """
+        try:
+            self._emit_progress('ela_running', '⚡ Running Error Level Analysis...')
+            
+            # Convert to RGB
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            
+            # Save at standard quality
+            temp_buffer = io.BytesIO()
+            img.save(temp_buffer, format='JPEG', quality=95)
+            temp_buffer.seek(0)
+            
+            # Reload compressed version
+            compressed = Image.open(temp_buffer)
+            
+            # Calculate pixel-level differences (ELA image)
+            ela_img = ImageChops.difference(img, compressed)
+            
+            # Convert to numpy for analysis
+            ela_array = np.array(ela_img)
+            
+            # Calculate statistics
+            gray_ela = np.mean(ela_array, axis=2)  # Convert to grayscale
+            mean_error = float(np.mean(gray_ela))
+            max_error = float(np.max(gray_ela))
+            std_error = float(np.std(gray_ela))
+            
+            # Generate heatmap data for frontend visualization
+            heatmap = await self._generate_ela_heatmap(gray_ela)
+            
+            # Detect suspicious regions
+            suspicious_regions = []
+            grid_size = 8  # Divide into 8x8 grid
+            h, w = gray_ela.shape
+            grid_h, grid_w = h // grid_size, w // grid_size
+            
+            for i in range(grid_size):
+                for j in range(grid_size):
+                    region = gray_ela[i*grid_h:(i+1)*grid_h, j*grid_w:(j+1)*grid_w]
+                    region_mean = float(np.mean(region))
+                    region_max = float(np.max(region))
+                    
+                    # Flag regions with high error levels
+                    if region_mean > mean_error * 1.5 or region_max > 150:
+                        severity = min(100, int((region_mean / mean_error) * 50))
+                        suspicious_regions.append({
+                            'x': j * grid_w,
+                            'y': i * grid_h,
+                            'width': grid_w,
+                            'height': grid_h,
+                            'severity': severity,
+                            'mean_error': region_mean,
+                            'max_error': region_max
+                        })
+            
+            # Determine overall manipulation level
+            manipulation_detected = std_error > ELA_THRESHOLD or len(suspicious_regions) > 3
+            
+            techniques = []
+            if std_error > ELA_THRESHOLD:
+                techniques.append(f"High ELA variance ({std_error:.1f}) - indicates inconsistent JPEG compression")
+            
+            if len(suspicious_regions) > 3:
+                techniques.append(f"{len(suspicious_regions)} suspicious regions detected with elevated error levels")
+            
+            # Calculate bright pixel percentage
+            bright_pixels = np.sum(gray_ela > 128) / gray_ela.size
+            if bright_pixels > 0.15:
+                techniques.append(f"Bright ELA patches ({bright_pixels*100:.1f}% of image) - strong editing indicator")
+            
+            self._emit_progress('ela_complete', 
+                f'✅ ELA complete - {"⚠️ MANIPULATION DETECTED" if manipulation_detected else "✅ No manipulation"} ({len(suspicious_regions)} suspicious regions)')
+            
+            return {
+                'manipulation_detected': manipulation_detected,
+                'techniques': techniques,
+                'statistics': {
+                    'mean_error': mean_error,
+                    'max_error': max_error,
+                    'std_error': std_error,
+                    'bright_pixel_ratio': float(bright_pixels)
+                },
+                'suspicious_regions': suspicious_regions,
+                'heatmap': heatmap,  # Grid-based heatmap for visualization
+                'image_dimensions': {'width': w, 'height': h}
+            }
+            
+        except Exception as e:
+            logger.error(f"ELA analysis error: {str(e)}")
+            return {
+                'manipulation_detected': False,
+                'techniques': [f"ELA analysis failed: {str(e)}"],
+                'suspicious_regions': [],
+                'heatmap': []
+            }
+    
+    async def _generate_ela_heatmap(self, gray_ela: np.ndarray) -> List[List[int]]:
+        """
+        Generate a grid-based heatmap of ELA values for frontend visualization
+        Returns 2D array of normalized intensity values (0-255)
+        """
+        try:
+            # Downsample to 32x32 grid for efficient transmission
+            grid_size = 32
+            h, w = gray_ela.shape
+            
+            heatmap = []
+            cell_h, cell_w = h // grid_size, w // grid_size
+            
+            for i in range(grid_size):
+                row = []
+                for j in range(grid_size):
+                    # Extract cell
+                    y_start = i * cell_h
+                    y_end = min((i + 1) * cell_h, h)
+                    x_start = j * cell_w
+                    x_end = min((j + 1) * cell_w, w)
+                    
+                    cell = gray_ela[y_start:y_end, x_start:x_end]
+                    
+                    # Calculate average intensity
+                    cell_intensity = int(np.mean(cell))
+                    row.append(cell_intensity)
+                
+                heatmap.append(row)
+            
+            return heatmap
+            
+        except Exception as e:
+            logger.error(f"Heatmap generation error: {str(e)}")
+            return []
+        """
         Error Level Analysis (ELA) - Detects JPEG compression inconsistencies
         Regions saved at different quality levels appear brighter in ELA
         """

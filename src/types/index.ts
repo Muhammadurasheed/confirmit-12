@@ -45,6 +45,7 @@ export interface ForensicDetails {
   metadata_flags?: string[]; // Backend snake_case
   agentLogs?: AgentLog[];
   agent_logs?: AgentLog[]; // Backend snake_case
+  technical_details?: any; // ELA analysis, forensic data
 }
 
 export interface AgentLog {
