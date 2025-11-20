@@ -119,11 +119,12 @@ class ReputationAgent:
             import hashlib
             account_hash = hashlib.sha256(account_number.encode()).hexdigest()
 
-            # Query Firestore for fraud reports
+            # Query Firestore for fraud reports using filter keyword argument
+            from google.cloud.firestore_v1 import FieldFilter
             fraud_reports = (
                 self.db.collection("fraud_reports")
-                .where("account_hash", "==", account_hash)
-                .where("status", "==", "verified")
+                .where(filter=FieldFilter("account_hash", "==", account_hash))
+                .where(filter=FieldFilter("status", "==", "verified"))
                 .get()
             )
 
@@ -153,12 +154,13 @@ class ReputationAgent:
                 " ".join(words[i : i + 3]) for i in range(len(words) - 2)
             ]
 
-            # Query verified businesses
+            # Query verified businesses using filter keyword argument
             for name in potential_names:
+                from google.cloud.firestore_v1 import FieldFilter
                 businesses = (
                     self.db.collection("businesses")
-                    .where("name", "==", name)
-                    .where("verification.verified", "==", True)
+                    .where(filter=FieldFilter("name", "==", name))
+                    .where(filter=FieldFilter("verification.verified", "==", True))
                     .limit(1)
                     .get()
                 )
