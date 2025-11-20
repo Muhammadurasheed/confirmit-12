@@ -55,25 +55,33 @@ async def analyze_receipt(request: AnalyzeReceiptRequest) -> Dict[str, Any]:
     - Reasoning Agent: Synthesis and verdict
     """
     try:
-        logger.info(f"Received analysis request for receipt: {request.receipt_id}")
+        logger.info(f"🎯 Received analysis request for receipt: {request.receipt_id}")
+        logger.info(f"📸 Image URL: {request.image_url[:100]}...")
 
         if not orchestrator:
+            logger.error("❌ Orchestrator not initialized - missing GEMINI_API_KEY")
             raise HTTPException(
                 status_code=503,
                 detail="AI service not properly configured. Check GEMINI_API_KEY.",
             )
 
         # Download image from Cloudinary
+        logger.info(f"⬇️ Downloading image from Cloudinary...")
         image_path = await download_image(request.image_url, request.receipt_id)
+        logger.info(f"✅ Image downloaded: {image_path}")
 
         # Run multi-agent analysis
+        logger.info(f"🤖 Starting multi-agent analysis...")
         result = await orchestrator.analyze_receipt(image_path, request.receipt_id)
 
-        logger.info(f"Analysis completed for receipt: {request.receipt_id}")
+        logger.info(f"✅ Analysis completed for receipt: {request.receipt_id}")
+        logger.info(f"📊 Trust Score: {result.get('trustScore')}, Verdict: {result.get('verdict')}")
         return result
 
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Analysis failed for receipt {request.receipt_id}: {str(e)}")
+        logger.error(f"❌ Analysis failed for receipt {request.receipt_id}: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -82,7 +90,7 @@ async def download_image(image_url: str, receipt_id: str) -> str:
     try:
         import tempfile
 
-        logger.info(f"Downloading image from: {image_url}")
+        logger.info(f"⬇️ Downloading image from: {image_url[:80]}...")
         
         async with httpx.AsyncClient() as client:
             # Cloudinary public images don't need authentication
@@ -103,6 +111,9 @@ async def download_image(image_url: str, receipt_id: str) -> str:
     except httpx.HTTPStatusError as e:
         logger.error(f"❌ HTTP error downloading image: {e.response.status_code} - {e.response.text}")
         raise Exception(f"Failed to download image from Cloudinary: HTTP {e.response.status_code}")
+    except httpx.TimeoutException:
+        logger.error(f"❌ Timeout downloading image after 30s")
+        raise Exception("Image download timed out - check Cloudinary URL")
     except Exception as e:
         logger.error(f"❌ Failed to download image: {str(e)}")
         raise Exception(f"Image download failed: {str(e)}")
