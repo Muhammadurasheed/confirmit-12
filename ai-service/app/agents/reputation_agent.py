@@ -16,7 +16,7 @@ class ReputationAgent:
     def __init__(self):
         self.db = firestore.client()
 
-    async def analyze(self, ocr_text: str) -> Dict[str, Any]:
+    async def analyze(self, ocr_text: str, progress=None) -> Dict[str, Any]:
         """
         Extract account numbers and check reputation
 
@@ -28,6 +28,14 @@ class ReputationAgent:
         """
         try:
             logger.info("Reputation agent analyzing extracted text")
+            
+            if progress:
+                await progress.emit(
+                    agent="reputation",
+                    stage="reputation_check",
+                    message="Checking account numbers and merchant reputation",
+                    progress=75
+                )
 
             # Extract account numbers (Nigerian format: 10 digits)
             account_numbers = self._extract_account_numbers(ocr_text)
@@ -63,6 +71,23 @@ class ReputationAgent:
             logger.info(
                 f"Reputation agent completed. Accounts checked: {len(accounts_analyzed)}"
             )
+            
+            if progress:
+                merchant_status = f"Verified: {merchant['business_name']}" if merchant else f"{len(accounts_analyzed)} accounts checked"
+                fraud_info = f"{total_fraud_reports} fraud reports" if total_fraud_reports > 0 else "No fraud history"
+                await progress.emit(
+                    agent="reputation",
+                    stage="reputation_complete",
+                    message=f"{merchant_status} - {fraud_info}",
+                    progress=80,
+                    details={
+                        'accounts_checked': len(accounts_analyzed),
+                        'fraud_reports': total_fraud_reports,
+                        'merchant_verified': merchant is not None,
+                        'trust_level': trust_level
+                    }
+                )
+            
             return result
 
         except Exception as e:

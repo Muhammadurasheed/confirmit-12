@@ -114,11 +114,17 @@ class ReceiptAnalysisOrchestrator:
 
             # Run reputation agent if we have extracted text
             if "vision" in agent_results:
+                merchant_name = agent_results['vision'].get('merchant_name', 'Unknown')
+                total_amount = agent_results['vision'].get('total_amount', 'N/A')
                 await progress.emit(
                     agent="orchestrator",
                     stage="reputation_check",
-                    message=f"Checking merchant reputation: {agent_results['vision'].get('merchant_name', 'Unknown')}",
-                    progress=70
+                    message=f"Verifying {merchant_name} (₦{total_amount})",
+                    progress=70,
+                    details={
+                        'merchant': merchant_name,
+                        'amount': total_amount
+                    }
                 )
                 
                 ocr_text = agent_results["vision"].get("ocr_text", "")
@@ -138,7 +144,7 @@ class ReceiptAnalysisOrchestrator:
                     )
 
             # Run reasoning agent to synthesize all results
-            final_analysis = await self._run_reasoning_agent(agent_results, receipt_id)
+            final_analysis = await self._run_reasoning_agent(agent_results, receipt_id, progress)
 
             # Calculate processing time
             processing_time = (datetime.now() - start_time).total_seconds()
@@ -195,24 +201,35 @@ class ReceiptAnalysisOrchestrator:
                 "agent_logs": agent_logs,
             }
 
-    async def _run_vision_agent(self, image_path: str, receipt_id: str) -> Dict:
+    async def _run_vision_agent(self, image_path: str, receipt_id: str, progress) -> Dict:
         """Run Gemini Vision agent for OCR and visual analysis"""
         try:
             logger.info(f"Running vision agent for {receipt_id}")
-            result = await self.vision_agent.analyze(image_path)
+            result = await self.vision_agent.analyze(image_path, progress)
             logger.info(f"Vision agent completed for {receipt_id}")
             return result
         except Exception as e:
             logger.error(f"Vision agent failed for {receipt_id}: {str(e)}")
             raise
 
-    async def _run_forensic_agent(self, image_path: str, receipt_id: str) -> Dict:
+    async def _run_forensic_agent(self, image_path: str, receipt_id: str, progress) -> Dict:
         """Run enhanced forensic analysis with progress tracking"""
         try:
             logger.info(f"Running enhanced forensic agent for {receipt_id}")
             # Create new forensic agent instance with progress callback
             from app.agents.forensic_agent import EnhancedForensicAgent
-            forensic = EnhancedForensicAgent(progress_callback=self._forensic_progress_callback)
+            
+            async def forensic_progress_wrapper(data):
+                """Wrapper to emit forensic progress through main progress emitter"""
+                await progress.emit(
+                    agent="forensic",
+                    stage=data.get('stage', 'analyzing'),
+                    message=data.get('message', 'Running forensic checks'),
+                    progress=data.get('progress', 40),
+                    details=data.get('details', {})
+                )
+            
+            forensic = EnhancedForensicAgent(progress_callback=forensic_progress_wrapper)
             result = await forensic.analyze(image_path)
             logger.info(f"Forensic agent completed for {receipt_id}")
             return result
@@ -220,22 +237,22 @@ class ReceiptAnalysisOrchestrator:
             logger.error(f"Forensic agent failed for {receipt_id}: {str(e)}")
             raise
 
-    async def _run_metadata_agent(self, image_path: str, receipt_id: str) -> Dict:
+    async def _run_metadata_agent(self, image_path: str, receipt_id: str, progress) -> Dict:
         """Run metadata extraction agent"""
         try:
             logger.info(f"Running metadata agent for {receipt_id}")
-            result = await self.metadata_agent.analyze(image_path)
+            result = await self.metadata_agent.analyze(image_path, progress)
             logger.info(f"Metadata agent completed for {receipt_id}")
             return result
         except Exception as e:
             logger.error(f"Metadata agent failed for {receipt_id}: {str(e)}")
             raise
 
-    async def _run_reputation_agent(self, ocr_text: str, receipt_id: str) -> Dict:
+    async def _run_reputation_agent(self, ocr_text: str, receipt_id: str, progress) -> Dict:
         """Run reputation checking agent"""
         try:
             logger.info(f"Running reputation agent for {receipt_id}")
-            result = await self.reputation_agent.analyze(ocr_text)
+            result = await self.reputation_agent.analyze(ocr_text, progress)
             logger.info(f"Reputation agent completed for {receipt_id}")
             return result
         except Exception as e:
@@ -243,12 +260,12 @@ class ReceiptAnalysisOrchestrator:
             raise
 
     async def _run_reasoning_agent(
-        self, agent_results: Dict, receipt_id: str
+        self, agent_results: Dict, receipt_id: str, progress
     ) -> Dict:
         """Run reasoning agent to synthesize all results"""
         try:
             logger.info(f"Running reasoning agent for {receipt_id}")
-            result = await self.reasoning_agent.synthesize(agent_results)
+            result = await self.reasoning_agent.synthesize(agent_results, progress)
             logger.info(f"Reasoning agent completed for {receipt_id}")
             return result
         except Exception as e:

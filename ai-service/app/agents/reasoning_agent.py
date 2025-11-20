@@ -13,7 +13,7 @@ class ReasoningAgent:
     def __init__(self):
         pass
 
-    async def synthesize(self, agent_results: Dict[str, Any]) -> Dict[str, Any]:
+    async def synthesize(self, agent_results: Dict[str, Any], progress=None) -> Dict[str, Any]:
         """
         Combine results from all agents into final analysis
 
@@ -25,6 +25,14 @@ class ReasoningAgent:
         """
         try:
             logger.info("Reasoning agent synthesizing results")
+            
+            if progress:
+                await progress.emit(
+                    agent="reasoning",
+                    stage="synthesis_started",
+                    message="Synthesizing all agent findings into final verdict",
+                    progress=85
+                )
 
             vision_data = agent_results.get("vision", {})
             forensic_data = agent_results.get("forensic", {})
@@ -59,6 +67,26 @@ class ReasoningAgent:
             logger.info(
                 f"Reasoning agent completed. Verdict: {verdict}, Score: {trust_score}"
             )
+            
+            if progress:
+                verdict_messages = {
+                    'authentic': 'Receipt appears authentic',
+                    'suspicious': 'Receipt has suspicious elements',
+                    'fraudulent': 'Receipt appears fraudulent',
+                    'unclear': 'Unable to determine authenticity'
+                }
+                await progress.emit(
+                    agent="reasoning",
+                    stage="synthesis_complete",
+                    message=f"{verdict_messages.get(verdict, 'Analysis complete')} - Trust Score: {trust_score}%",
+                    progress=95,
+                    details={
+                        'trust_score': trust_score,
+                        'verdict': verdict,
+                        'issues_count': len(issues)
+                    }
+                )
+            
             return result
 
         except Exception as e:
