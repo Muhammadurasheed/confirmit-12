@@ -2,6 +2,7 @@
 Vision Agent - Uses Tesseract OCR (primary) + Gemini Vision (fallback) for receipt analysis
 """
 import logging
+import os
 import google.generativeai as genai
 from PIL import Image
 from typing import Dict, Any
@@ -17,8 +18,9 @@ class VisionAgent:
 
     def __init__(self, api_key: str):
         genai.configure(api_key=api_key)
-        # Use gemini-1.5-flash - more stable, better quotas than experimental model
-        self.model = genai.GenerativeModel("gemini-1.5-flash")
+        # Use gemini-2.5-flash - latest, most accurate, production-ready model
+        # Alternative: gemini-2.0-flash-exp for experimental features
+        self.model = genai.GenerativeModel("gemini-2.5-flash")
 
     async def analyze(self, image_path: str, progress=None) -> Dict[str, Any]:
         """
@@ -89,6 +91,23 @@ class VisionAgent:
     async def _analyze_with_tesseract(self, img: Image) -> Dict[str, Any]:
         """Use Tesseract OCR for text extraction (FREE, local)"""
         try:
+            # Configure Tesseract path for Windows if needed
+            # User should install: https://github.com/UB-Mannheim/tesseract/wiki
+            # Windows: Set environment variable TESSERACT_PATH or install to default location
+            import platform
+            if platform.system() == 'Windows':
+                # Try common installation paths
+                possible_paths = [
+                    r'C:\Program Files\Tesseract-OCR\tesseract.exe',
+                    r'C:\Program Files (x86)\Tesseract-OCR\tesseract.exe',
+                    os.environ.get('TESSERACT_PATH', '')
+                ]
+                for path in possible_paths:
+                    if os.path.exists(path):
+                        pytesseract.pytesseract.tesseract_cmd = path
+                        logger.info(f"✅ Tesseract found at: {path}")
+                        break
+                        
             # Extract text with confidence data
             ocr_data = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT)
             
@@ -192,39 +211,54 @@ class VisionAgent:
                         progress=25
                     )
 
-                # FORENSIC PROMPT - designed to detect manipulated receipts
-                prompt = """You are a FORENSIC DOCUMENT ANALYST. Analyze this receipt for authenticity and fraud indicators.
+                # ENHANCED FORENSIC PROMPT - specifically targeting amount manipulation
+                prompt = """You are an ELITE FORENSIC DOCUMENT ANALYST specializing in financial fraud detection.
 
-TASK 1: Extract ALL visible text (be thorough - extract everything you can see)
+CRITICAL: This receipt may have been MANIPULATED. Your job is to catch fraud attempts.
 
-TASK 2: Forensic fraud detection - look for these RED FLAGS:
-- Font inconsistencies (weight, size, style variations in similar text fields)
-- Color anomalies (same color appearing in different shades - e.g., amount text brighter than surrounding text)
-- Spacing issues (unnatural gaps, misaligned text that doesn't match the overall layout)
-- Overlay artifacts (text that appears to be added on top of the image)
-- Excessive watermarking (suspicious patterns that may hide manipulation)
+🎯 PRIMARY FOCUS - AMOUNT FIELD MANIPULATION (Most Common Fraud):
+Pay EXTREME attention to the AMOUNT/TOTAL field:
+- Does the amount text look THICKER or BOLDER than other text?
+- Is the amount text a DIFFERENT SHADE of green compared to other green text?
+- Does the amount have UNNATURAL SPACING or alignment?
+- Does the amount look like it was OVERLAID or PASTED onto the image?
+- Is there any BLURRINESS, PIXELATION, or ARTIFACTS around the amount?
 
-Return ONLY raw JSON (no markdown, no code blocks, no explanations):
+TASK 1: Extract ALL visible text thoroughly
+- Include merchant name, amount, date, recipient, sender, transaction details
+- Note if text extraction is suspiciously low (may indicate tampering)
+
+TASK 2: Visual fraud detection - RED FLAGS to report:
+- Font weight differences (e.g., "₦1,500,000" text appears bolder than "₦" symbol or surrounding text)
+- Color saturation anomalies (amount field brighter/darker than other green text like logo)
+- Spacing irregularities (unnatural gaps around critical fields like amount)
+- Text overlay signs (sharp edges, different pixel quality, misalignment)
+- Excessive watermarking that may hide editing traces
+
+Return ONLY raw JSON (no markdown, no code blocks):
 {
-  "ocr_text": "Complete extracted text - include everything visible",
-  "confidence_score": 85,
-  "merchant_name": "Exact business name",
-  "total_amount": "Amount value",
+  "ocr_text": "Complete extracted text",
+  "confidence_score": 0-100,
+  "merchant_name": "Business name",
+  "total_amount": "Amount as string",
   "currency": "NGN",
-  "receipt_date": "2025-11-20",
-  "items": ["item 1", "item 2"],
-  "account_numbers": ["account numbers"],
+  "receipt_date": "YYYY-MM-DD",
+  "items": ["line items"],
+  "account_numbers": ["10-digit accounts"],
   "phone_numbers": ["phone numbers"],
   "visual_quality": "excellent|good|fair|poor",
   "visual_anomalies": [
-    "Font weight inconsistency detected in amount field - text appears thicker/bolder than surrounding text",
-    "Color saturation difference - amount text shows brighter/different shade compared to other text",
-    "Unnatural spacing around specific fields - suggests editing",
-    "Text overlay artifacts visible - signs of photo manipulation"
-  ]
+    "SPECIFIC finding 1: Amount text (₦1,500,000) appears BOLDER/THICKER than logo text - indicates digital manipulation",
+    "SPECIFIC finding 2: Amount green color is BRIGHTER (higher saturation) than OPay logo green - different source",
+    "SPECIFIC finding 3: Unnatural spacing detected around amount field - suggests overlay editing"
+  ],
+  "fraud_confidence": "high|medium|low - How confident are you this is fake?"
 }
 
-CRITICAL: Be thorough with fraud detection. List EVERY suspicious visual pattern you detect."""
+⚠️ IMPORTANT: 
+- If amount looks manipulated, SET fraud_confidence to "high" and confidence_score below 50
+- Be EXTREMELY suspicious of receipts with low text extraction or visual inconsistencies
+- List EVERY suspicious pattern you see - err on the side of flagging suspicious items"""
 
                 if progress:
                     await progress.emit(

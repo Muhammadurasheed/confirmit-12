@@ -8,6 +8,7 @@ interface ReceiptState {
   // Analysis progress tracking
   analysisProgress: number;
   analysisStatus: string;
+  analysisMessage?: string; // Detailed message from agents
   isAnalyzing: boolean;
   
   // Results
@@ -18,7 +19,7 @@ interface ReceiptState {
   
   // Actions
   setReceipt: (receipt: Receipt) => void;
-  updateProgress: (progress: number, status: string) => void;
+  updateProgress: (progress: number, status: string, message?: string) => void;
   setResults: (results: AnalysisResult) => void;
   startAnalysis: () => void;
   completeAnalysis: () => void;
@@ -31,6 +32,7 @@ export const useReceiptStore = create<ReceiptState>((set) => ({
   currentReceipt: null,
   analysisProgress: 0,
   analysisStatus: 'idle',
+  analysisMessage: undefined,
   isAnalyzing: false,
   results: null,
   history: [],
@@ -38,14 +40,14 @@ export const useReceiptStore = create<ReceiptState>((set) => ({
   setReceipt: (receipt) => 
     set({ currentReceipt: receipt }),
 
-  updateProgress: (progress, status) =>
-    set({ analysisProgress: progress, analysisStatus: status }),
+  updateProgress: (progress, status, message) =>
+    set({ analysisProgress: progress, analysisStatus: status, analysisMessage: message || status }),
 
   setResults: (results) =>
     set({ results }),
 
   startAnalysis: () =>
-    set({ isAnalyzing: true, analysisProgress: 0, analysisStatus: 'Starting analysis...' }),
+    set({ isAnalyzing: true, analysisProgress: 0, analysisStatus: 'Starting analysis...', analysisMessage: undefined }),
 
   completeAnalysis: () =>
     set({ isAnalyzing: false, analysisProgress: 100, analysisStatus: 'Analysis complete' }),
@@ -61,6 +63,7 @@ export const useReceiptStore = create<ReceiptState>((set) => ({
       currentReceipt: null,
       analysisProgress: 0,
       analysisStatus: 'idle',
+      analysisMessage: undefined,
       isAnalyzing: false,
       results: null,
     }),
