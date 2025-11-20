@@ -100,7 +100,10 @@ export class ReceiptsService {
             receipt_id: receiptId,
           },
           {
-            timeout: 60000, // 60 second timeout
+            timeout: 180000, // 3 minute timeout for Gemini + forensics
+            headers: {
+              'Content-Type': 'application/json',
+            },
           },
         );
 

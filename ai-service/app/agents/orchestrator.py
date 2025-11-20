@@ -41,20 +41,39 @@ class ReceiptAnalysisOrchestrator:
 
         Returns comprehensive analysis including trust score, verdict, issues, etc.
         """
+        from app.core.progress_emitter import ProgressEmitter
+        
         start_time = datetime.now()
         agent_results = {}
         agent_logs = []
         self.forensic_progress_log = []  # Reset progress log
+        
+        # Initialize progress emitter
+        progress = ProgressEmitter(receipt_id)
 
         try:
             # Run agents in parallel with timeouts
             logger.info(f"Starting multi-agent analysis for receipt {receipt_id}")
+            
+            await progress.emit(
+                agent="orchestrator",
+                stage="analysis_started",
+                message="Initializing AI agents for receipt analysis",
+                progress=5
+            )
 
             # Execute all agents concurrently
+            await progress.emit(
+                agent="orchestrator",
+                stage="agents_running",
+                message="Running vision, forensic, and metadata analysis in parallel",
+                progress=20
+            )
+            
             results = await asyncio.gather(
-                self._run_vision_agent(image_path, receipt_id),
-                self._run_forensic_agent(image_path, receipt_id),
-                self._run_metadata_agent(image_path, receipt_id),
+                self._run_vision_agent(image_path, receipt_id, progress),
+                self._run_forensic_agent(image_path, receipt_id, progress),
+                self._run_metadata_agent(image_path, receipt_id, progress),
                 return_exceptions=True,
             )
 
@@ -95,9 +114,16 @@ class ReceiptAnalysisOrchestrator:
 
             # Run reputation agent if we have extracted text
             if "vision" in agent_results:
+                await progress.emit(
+                    agent="orchestrator",
+                    stage="reputation_check",
+                    message=f"Checking merchant reputation: {agent_results['vision'].get('merchant_name', 'Unknown')}",
+                    progress=70
+                )
+                
                 ocr_text = agent_results["vision"].get("ocr_text", "")
                 reputation_result = await self._run_reputation_agent(
-                    ocr_text, receipt_id
+                    ocr_text, receipt_id, progress
                 )
                 if not isinstance(reputation_result, Exception):
                     agent_results["reputation"] = reputation_result
