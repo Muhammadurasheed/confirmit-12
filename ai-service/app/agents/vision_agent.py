@@ -343,33 +343,3 @@ CRITICAL: Be thorough with fraud detection. List EVERY suspicious visual pattern
         
         # Should never reach here
         raise Exception("Gemini analysis failed after all retries")
-                
-                # Check if it's a quota/rate limit error
-                if '429' in error_msg or 'quota' in error_msg.lower() or 'rate limit' in error_msg.lower():
-                    if attempt < max_retries - 1:
-                        # Exponential backoff
-                        wait_time = retry_delay * (2 ** attempt)
-                        logger.warning(f"⏳ Rate limit hit, retrying in {wait_time}s... (attempt {attempt + 1}/{max_retries})")
-                        await asyncio.sleep(wait_time)
-                        continue
-                    else:
-                        logger.error(f"❌ Gemini Vision failed after {max_retries} attempts due to rate limits")
-                        # Return empty result instead of crashing
-                        return {
-                            "ocr_text": "",
-                            "confidence": 0,
-                            "merchant_name": None,
-                            "total_amount": None,
-                            "currency": None,
-                            "receipt_date": None,
-                            "items": [],
-                            "account_numbers": [],
-                            "phone_numbers": [],
-                            "visual_quality": "poor",
-                            "visual_anomalies": ["API quota exceeded"],
-                            "ocr_method": "gemini_failed"
-                        }
-                else:
-                    # Non-rate-limit error, raise it
-                    logger.error(f"Gemini Vision error: {error_msg}")
-                    raise
