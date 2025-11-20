@@ -62,55 +62,57 @@ class ReceiptAnalysisOrchestrator:
                 progress=5
             )
 
-            # Execute all agents concurrently
+            # Execute vision and metadata first (parallel)
             await progress.emit(
                 agent="orchestrator",
                 stage="agents_running",
-                message="Running vision, forensic, and metadata analysis in parallel",
+                message="Running vision and metadata analysis",
                 progress=20
             )
             
-            results = await asyncio.gather(
+            vision_result, metadata_result = await asyncio.gather(
                 self._run_vision_agent(image_path, receipt_id, progress),
-                self._run_forensic_agent(image_path, receipt_id, progress),
                 self._run_metadata_agent(image_path, receipt_id, progress),
                 return_exceptions=True,
             )
-
-            # Process results
-            vision_result, forensic_result, metadata_result = results
-
+            
+            # Check vision result
             if not isinstance(vision_result, Exception):
                 agent_results["vision"] = vision_result
-                agent_logs.append(
-                    {
-                        "agent": "vision",
-                        "status": "success",
-                        "confidence": vision_result.get("confidence", 0),
-                    }
-                )
-
-            if not isinstance(forensic_result, Exception):
-                agent_results["forensic"] = forensic_result
-                agent_logs.append(
-                    {
-                        "agent": "forensic",
-                        "status": "success",
-                        "manipulation_score": forensic_result.get(
-                            "manipulation_score", 0
-                        ),
-                    }
-                )
-
+                agent_logs.append({
+                    "agent": "vision",
+                    "status": "success",
+                    "confidence": vision_result.get("confidence", 0),
+                })
+            
+            # Check metadata result
             if not isinstance(metadata_result, Exception):
                 agent_results["metadata"] = metadata_result
-                agent_logs.append(
-                    {
-                        "agent": "metadata",
-                        "status": "success",
-                        "flags": len(metadata_result.get("flags", [])),
-                    }
-                )
+                agent_logs.append({
+                    "agent": "metadata",
+                    "status": "success",
+                    "flags": len(metadata_result.get("flags", [])),
+                })
+            
+            # Now run forensic with vision context for better analysis
+            await progress.emit(
+                agent="orchestrator",
+                stage="forensic_analysis",
+                message="Running forensic ELA analysis with vision context",
+                progress=40
+            )
+            
+            forensic_result = await self._run_forensic_agent(
+                image_path, receipt_id, progress, vision_data=vision_result if not isinstance(vision_result, Exception) else None
+            )
+            
+            if not isinstance(forensic_result, Exception):
+                agent_results["forensic"] = forensic_result
+                agent_logs.append({
+                    "agent": "forensic",
+                    "status": "success",
+                    "manipulation_score": forensic_result.get("manipulation_score", 0),
+                })
 
             # Run reputation agent if we have extracted text
             if "vision" in agent_results:
@@ -212,8 +214,8 @@ class ReceiptAnalysisOrchestrator:
             logger.error(f"Vision agent failed for {receipt_id}: {str(e)}")
             raise
 
-    async def _run_forensic_agent(self, image_path: str, receipt_id: str, progress) -> Dict:
-        """Run enhanced forensic analysis with progress tracking"""
+    async def _run_forensic_agent(self, image_path: str, receipt_id: str, progress, vision_data: Dict = None) -> Dict:
+        """Run enhanced forensic analysis with progress tracking and vision context"""
         try:
             logger.info(f"Running enhanced forensic agent for {receipt_id}")
             # Create new forensic agent instance with progress callback
@@ -230,7 +232,14 @@ class ReceiptAnalysisOrchestrator:
                 )
             
             forensic = EnhancedForensicAgent(progress_callback=forensic_progress_wrapper)
-            result = await forensic.analyze(image_path)
+            
+            # Pass vision data for context-aware analysis
+            receipt_context = {
+                'merchant_name': vision_data.get('merchant_name') if vision_data else None,
+                'total_amount': vision_data.get('total_amount') if vision_data else None,
+            }
+            
+            result = await forensic.analyze(image_path, receipt_data=receipt_context)
             logger.info(f"Forensic agent completed for {receipt_id}")
             return result
         except Exception as e:

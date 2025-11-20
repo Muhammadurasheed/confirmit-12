@@ -76,9 +76,13 @@ class EnhancedForensicAgent:
             }
         }
 
-    async def analyze(self, image_path: str) -> Dict[str, Any]:
+    async def analyze(self, image_path: str, receipt_data: Dict[str, Any] = None) -> Dict[str, Any]:
         """
         Master forensic analysis pipeline
+        
+        Args:
+            image_path: Path to receipt image
+            receipt_data: Optional OCR data for context-aware analysis
         
         Returns comprehensive forensic report with manipulation score,
         detected techniques, suspicious regions, and expert verdict
@@ -91,13 +95,17 @@ class EnhancedForensicAgent:
             img = Image.open(image_path)
             img_array = np.array(img)
 
-            # Extract merchant/amount for specific progress messages
-            merchant_name = receipt_data.get('merchant_name', 'merchant')
-            amount = receipt_data.get('total_amount', 'amount')
+            # Extract merchant/amount for specific progress messages (if provided)
+            if receipt_data:
+                merchant_name = receipt_data.get('merchant_name', 'merchant')
+                amount = receipt_data.get('total_amount', 'amount')
+            else:
+                merchant_name = 'merchant'
+                amount = 'amount'
             
             # Stage 1: Pixel-Level Forensics
             self._emit_progress('pixel_analysis', f'🔍 Stage 1/5: Examining pixel patterns around "{merchant_name}" and ₦{amount} fields...')
-            pixel_results = await self._analyze_pixels(img_array, receipt_data)
+            pixel_results = await self._analyze_pixels(img_array, receipt_data or {})
 
             # Stage 2: Error Level Analysis (ELA)
             self._emit_progress('ela_analysis', f'⚡ Stage 2/5: Running ELA on transaction ID and amount fields - detecting re-saved regions...')
