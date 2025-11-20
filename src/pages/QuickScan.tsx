@@ -350,6 +350,7 @@ const QuickScan = () => {
                 {/* Results */}
                 <ResultsDisplay
                   receiptId={currentReceipt.receiptId}
+                  receiptImageUrl={currentReceipt.storagePath}
                   trustScore={(results.trust_score || results.trustScore || 0) as number}
                   verdict={(results.verdict || 'unclear') as any}
                   issues={results.issues || []}
@@ -358,6 +359,7 @@ const QuickScan = () => {
                     ocr_confidence: (results.forensic_details?.ocr_confidence || results.forensicDetails?.ocr_confidence || results.forensicDetails?.ocrConfidence || 0) as number,
                     manipulation_score: (results.forensic_details?.manipulation_score || results.forensicDetails?.manipulation_score || results.forensicDetails?.manipulationScore || 0) as number,
                     metadata_flags: (results.forensic_details?.metadata_flags || results.forensicDetails?.metadata_flags || results.forensicDetails?.metadataFlags || []) as string[],
+                    technical_details: results.forensic_details?.technical_details || results.forensicDetails?.technical_details,
                   }}
                   merchant={results.merchant ? {
                     name: results.merchant.name,
