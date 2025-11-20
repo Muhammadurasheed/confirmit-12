@@ -14,6 +14,7 @@ import HederaBadge from '@/components/shared/HederaBadge';
 interface ResultsDisplayProps {
   receiptId: string;
   receiptImageUrl?: string;
+  ocrText?: string; // Add OCR text prop
   trustScore: number;
   verdict: 'authentic' | 'suspicious' | 'fraudulent' | 'unclear';
   issues: Array<{
@@ -30,6 +31,19 @@ interface ResultsDisplayProps {
     techniques_detected?: string[];
     authenticity_indicators?: string[];
     technical_details?: any;
+    forensic_progress?: Array<{
+      stage: string;
+      message: string;
+      progress: number;
+      details?: Record<string, any>;
+    }>;
+    agent_logs?: Array<{
+      agent: string;
+      status: string;
+      confidence?: number;
+      manipulation_score?: number;
+      flags?: number;
+    }>;
   };
   merchant?: {
     name: string;
@@ -73,6 +87,7 @@ const verdictConfig = {
 export const ResultsDisplay = ({
   receiptId,
   receiptImageUrl,
+  ocrText, // Destructure OCR text
   trustScore,
   verdict,
   issues = [],
@@ -325,6 +340,7 @@ export const ResultsDisplay = ({
         receiptId={receiptId}
         receiptImageUrl={receiptImageUrl}
         forensicDetails={safeForensicDetails}
+        ocrText={ocrText} // Pass OCR text to modal
       />
       <HederaAnchorModal
         open={showHederaModal}
