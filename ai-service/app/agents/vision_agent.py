@@ -181,61 +181,61 @@ IMPORTANT:
                 # Generate content with retry
                 response = await self.model.generate_content_async([prompt, img])
 
-            # Parse response
-            response_text = response.text.strip()
-            
-            logger.info(f"Gemini raw response length: {len(response_text)} chars")
+                # Parse response
+                response_text = response.text.strip()
+                
+                logger.info(f"Gemini raw response length: {len(response_text)} chars")
 
-            # Try to extract JSON from response
-            import json
-            import re
+                # Try to extract JSON from response
+                import json
+                import re
 
-            # Remove markdown code blocks if present
-            response_text = re.sub(r'```json\s*', '', response_text)
-            response_text = re.sub(r'```\s*$', '', response_text)
-            response_text = response_text.strip()
+                # Remove markdown code blocks if present
+                response_text = re.sub(r'```json\s*', '', response_text)
+                response_text = re.sub(r'```\s*$', '', response_text)
+                response_text = response_text.strip()
 
-            # Find JSON in response
-            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-            if json_match:
-                try:
-                    analysis_data = json.loads(json_match.group())
-                    logger.info(f"Successfully parsed JSON from Gemini response")
-                except json.JSONDecodeError as je:
-                    logger.error(f"JSON parse error: {str(je)}")
-                    # Fallback: create structured data from raw text
+                # Find JSON in response
+                json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+                if json_match:
+                    try:
+                        analysis_data = json.loads(json_match.group())
+                        logger.info(f"Successfully parsed JSON from Gemini response")
+                    except json.JSONDecodeError as je:
+                        logger.error(f"JSON parse error: {str(je)}")
+                        # Fallback: create structured data from raw text
+                        analysis_data = {
+                            "ocr_text": response_text,
+                            "confidence_score": 75,
+                            "visual_quality": "good",
+                            "visual_anomalies": [],
+                        }
+                else:
+                    logger.warning("No JSON found in Gemini response, using fallback")
+                    # Fallback if no JSON found
                     analysis_data = {
                         "ocr_text": response_text,
                         "confidence_score": 75,
-                        "visual_quality": "good",
+                        "visual_quality": "good", 
                         "visual_anomalies": [],
                     }
-            else:
-                logger.warning("No JSON found in Gemini response, using fallback")
-                # Fallback if no JSON found
-                analysis_data = {
-                    "ocr_text": response_text,
-                    "confidence_score": 75,
-                    "visual_quality": "good", 
-                    "visual_anomalies": [],
+
+                # Calculate confidence (be generous - default to 75 instead of 70)
+                confidence = analysis_data.get("confidence_score", 75)
+
+                result = {
+                    "ocr_text": analysis_data.get("ocr_text", response_text),
+                    "confidence": confidence,
+                    "merchant_name": analysis_data.get("merchant_name"),
+                    "total_amount": analysis_data.get("total_amount"),
+                    "currency": analysis_data.get("currency"),
+                    "receipt_date": analysis_data.get("receipt_date"),
+                    "items": analysis_data.get("items", []),
+                    "account_numbers": analysis_data.get("account_numbers", []),
+                    "phone_numbers": analysis_data.get("phone_numbers", []),
+                    "visual_quality": analysis_data.get("visual_quality", "good"),
+                    "visual_anomalies": analysis_data.get("visual_anomalies", []),
                 }
-
-            # Calculate confidence (be generous - default to 75 instead of 70)
-            confidence = analysis_data.get("confidence_score", 75)
-
-            result = {
-                "ocr_text": analysis_data.get("ocr_text", response_text),
-                "confidence": confidence,
-                "merchant_name": analysis_data.get("merchant_name"),
-                "total_amount": analysis_data.get("total_amount"),
-                "currency": analysis_data.get("currency"),
-                "receipt_date": analysis_data.get("receipt_date"),
-                "items": analysis_data.get("items", []),
-                "account_numbers": analysis_data.get("account_numbers", []),
-                "phone_numbers": analysis_data.get("phone_numbers", []),
-                "visual_quality": analysis_data.get("visual_quality", "good"),
-                "visual_anomalies": analysis_data.get("visual_anomalies", []),
-            }
 
                 logger.info(f"Gemini Vision completed with confidence: {result.get('confidence')}")
                 result['ocr_method'] = 'gemini'
