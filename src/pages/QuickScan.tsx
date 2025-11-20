@@ -99,6 +99,13 @@ const QuickScan = () => {
       const mappedStatus = statusMap[data.stage] || 'processing';
       updateProgress(data.progress || 0, mappedStatus, data.message);
       
+      // Store agent-specific data for display
+      setReceipt({
+        ...currentReceipt!,
+        currentAgent: data.agent,
+        agentDetails: data.details
+      });
+      
       // Show toast for important milestones
       if (data.stage === 'forensics_running' && data.details?.fraud_indicators) {
         toast.info(`⚠️ ${data.details.fraud_indicators} fraud indicators detected`);
