@@ -175,88 +175,147 @@ class VisionAgent:
         """Extract phone numbers"""
         return re.findall(r'\b(?:\+234|0)\d{10}\b', text)
 
-    async def _analyze_with_gemini(self, img: Image, image_path: str) -> Dict[str, Any]:
-        """Fallback to Gemini Vision API with retry logic"""
+    async def _analyze_with_gemini(self, img: Image, image_path: str, progress=None) -> Dict[str, Any]:
+        """Enhanced Gemini Vision API with forensic fraud detection"""
         max_retries = 3
-        retry_delay = 1  # Start with 1 second
+        retry_delay = 1
         
         for attempt in range(max_retries):
             try:
-                logger.info(f"Gemini Vision attempt {attempt + 1}/{max_retries}")
+                logger.info(f"🔍 Gemini Vision attempt {attempt + 1}/{max_retries}")
                 
-                # Create detailed prompt for receipt analysis
-                prompt = """You are analyzing a receipt/transaction slip image. Extract ALL visible text and information.
+                if progress:
+                    await progress.emit(
+                        agent="vision",
+                        stage="analyzing",
+                        message="Initializing Google Gemini Vision AI for forensic receipt analysis",
+                        progress=25
+                    )
 
-CRITICAL: Even if the image quality is not perfect, extract whatever text you can see. Do your best!
+                # FORENSIC PROMPT - designed to detect manipulated receipts
+                prompt = """You are a FORENSIC DOCUMENT ANALYST. Analyze this receipt for authenticity and fraud indicators.
 
-Return ONLY a JSON object (no markdown, no explanation) with these exact fields:
+TASK 1: Extract ALL visible text (be thorough - extract everything you can see)
+
+TASK 2: Forensic fraud detection - look for these RED FLAGS:
+- Font inconsistencies (weight, size, style variations in similar text fields)
+- Color anomalies (same color appearing in different shades - e.g., amount text brighter than surrounding text)
+- Spacing issues (unnatural gaps, misaligned text that doesn't match the overall layout)
+- Overlay artifacts (text that appears to be added on top of the image)
+- Excessive watermarking (suspicious patterns that may hide manipulation)
+
+Return ONLY raw JSON (no markdown, no code blocks, no explanations):
 {
-  "ocr_text": "ALL text visible on the receipt, exactly as shown",
-  "merchant_name": "business/bank name (or null)",
-  "total_amount": "transaction amount as number (or null)",
-  "currency": "currency code like NGN, USD (or null)",
-  "receipt_date": "date in YYYY-MM-DD format (or null)",
-  "items": ["list of items/transaction details"],
-  "account_numbers": ["any account numbers found"],
-  "phone_numbers": ["any phone numbers found"],
-  "visual_quality": "excellent",
-  "visual_anomalies": [],
-  "confidence_score": 85
+  "ocr_text": "Complete extracted text - include everything visible",
+  "confidence_score": 85,
+  "merchant_name": "Exact business name",
+  "total_amount": "Amount value",
+  "currency": "NGN",
+  "receipt_date": "2025-11-20",
+  "items": ["item 1", "item 2"],
+  "account_numbers": ["account numbers"],
+  "phone_numbers": ["phone numbers"],
+  "visual_quality": "excellent|good|fair|poor",
+  "visual_anomalies": [
+    "Font weight inconsistency detected in amount field - text appears thicker/bolder than surrounding text",
+    "Color saturation difference - amount text shows brighter/different shade compared to other text",
+    "Unnatural spacing around specific fields - suggests editing",
+    "Text overlay artifacts visible - signs of photo manipulation"
+  ]
 }
 
-IMPORTANT: 
-- Set confidence_score to 85-95 if you can read most of the text clearly
-- Set visual_quality to "excellent" if the receipt is readable (even if not perfect)
-- Extract ALL text you see, even if the image is slightly blurred
-- Be generous with confidence scores - receipts don't need to be perfect to be readable"""
+CRITICAL: Be thorough with fraud detection. List EVERY suspicious visual pattern you detect."""
 
-                # Generate content with retry
-                response = await self.model.generate_content_async([prompt, img])
+                if progress:
+                    await progress.emit(
+                        agent="vision",
+                        stage="gemini_analyzing",
+                        message="Gemini AI performing forensic analysis on receipt image",
+                        progress=30
+                    )
 
-                # Parse response
-                response_text = response.text.strip()
+                # Call Gemini with generation config
+                response = await self.model.generate_content_async(
+                    [prompt, img],
+                    generation_config={
+                        "temperature": 0.1,
+                        "top_p": 0.95,
+                        "max_output_tokens": 2048,
+                    }
+                )
                 
-                logger.info(f"Gemini raw response length: {len(response_text)} chars")
-
-                # Try to extract JSON from response
+                if not response or not response.text:
+                    raise Exception("Gemini returned empty response")
+                
+                response_text = response.text.strip()
+                logger.info(f"📄 Gemini response received: {len(response_text)} chars")
+                
+                # Parse JSON response
                 import json
                 import re
 
-                # Remove markdown code blocks if present
-                response_text = re.sub(r'```json\s*', '', response_text)
-                response_text = re.sub(r'```\s*$', '', response_text)
-                response_text = response_text.strip()
+                # Clean markdown formatting
+                cleaned = response_text
+                cleaned = re.sub(r'^```json\s*', '', cleaned)
+                cleaned = re.sub(r'^```\s*', '', cleaned)
+                cleaned = re.sub(r'\s*```$', '', cleaned)
+                cleaned = cleaned.strip()
 
-                # Find JSON in response
-                json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-                if json_match:
-                    try:
-                        analysis_data = json.loads(json_match.group())
-                        logger.info(f"Successfully parsed JSON from Gemini response")
-                    except json.JSONDecodeError as je:
-                        logger.error(f"JSON parse error: {str(je)}")
-                        # Fallback: create structured data from raw text
-                        analysis_data = {
-                            "ocr_text": response_text,
-                            "confidence_score": 75,
-                            "visual_quality": "good",
-                            "visual_anomalies": [],
+                # Extract JSON
+                json_match = re.search(r'\{.*\}', cleaned, re.DOTALL)
+                
+                if not json_match:
+                    logger.error(f"❌ No JSON found in Gemini response")
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(retry_delay)
+                        retry_delay *= 2
+                        continue
+                    raise Exception("Failed to parse Gemini response as JSON")
+                
+                try:
+                    analysis_data = json.loads(json_match.group())
+                    logger.info(f"✅ Successfully parsed Gemini JSON")
+                except json.JSONDecodeError as je:
+                    logger.error(f"❌ JSON decode error: {str(je)}")
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(retry_delay)
+                        retry_delay *= 2
+                        continue
+                    raise
+
+                # Validate and process results
+                ocr_text = analysis_data.get("ocr_text", "").strip()
+                ocr_length = len(ocr_text)
+                
+                # CRITICAL: Low text extraction is a RED FLAG
+                if ocr_length < 20:
+                    logger.warning(f"⚠️ CRITICAL: Only {ocr_length} chars extracted - possible tampering")
+                    analysis_data["confidence_score"] = max(0, analysis_data.get("confidence_score", 50) - 40)
+                    analysis_data.setdefault("visual_anomalies", []).append(
+                        f"Very low text extraction ({ocr_length} chars) - image may be tampered, corrupted, or illegible"
+                    )
+                
+                confidence = max(0, min(100, analysis_data.get("confidence_score", 50)))
+                visual_anomalies = analysis_data.get("visual_anomalies", [])
+                
+                if progress:
+                    anomaly_count = len(visual_anomalies)
+                    status_msg = f"⚠️ {anomaly_count} fraud indicators detected" if anomaly_count > 0 else "✅ No fraud indicators detected"
+                    await progress.emit(
+                        agent="vision",
+                        stage="analysis_complete",
+                        message=f"Vision analysis complete. {status_msg}",
+                        progress=40,
+                        details={
+                            "merchant": analysis_data.get("merchant_name"),
+                            "amount": analysis_data.get("total_amount"),
+                            "confidence": confidence,
+                            "fraud_indicators": anomaly_count
                         }
-                else:
-                    logger.warning("No JSON found in Gemini response, using fallback")
-                    # Fallback if no JSON found
-                    analysis_data = {
-                        "ocr_text": response_text,
-                        "confidence_score": 75,
-                        "visual_quality": "good", 
-                        "visual_anomalies": [],
-                    }
-
-                # Calculate confidence (be generous - default to 75 instead of 70)
-                confidence = analysis_data.get("confidence_score", 75)
-
+                    )
+                
                 result = {
-                    "ocr_text": analysis_data.get("ocr_text", response_text),
+                    "ocr_text": ocr_text,
                     "confidence": confidence,
                     "merchant_name": analysis_data.get("merchant_name"),
                     "total_amount": analysis_data.get("total_amount"),
@@ -265,31 +324,25 @@ IMPORTANT:
                     "items": analysis_data.get("items", []),
                     "account_numbers": analysis_data.get("account_numbers", []),
                     "phone_numbers": analysis_data.get("phone_numbers", []),
-                    "visual_quality": analysis_data.get("visual_quality", "good"),
-                    "visual_anomalies": analysis_data.get("visual_anomalies", []),
+                    "visual_quality": analysis_data.get("visual_quality", "fair"),
+                    "visual_anomalies": visual_anomalies,
+                    "ocr_method": "gemini"
                 }
 
-                logger.info(f"Gemini Vision completed with confidence: {result.get('confidence')}")
-                result['ocr_method'] = 'gemini'
-                
-                if progress:
-                    await progress.emit(
-                        agent="vision",
-                        stage="ocr_complete",
-                        message=f"Found {result.get('merchant_name', 'receipt')} - ₦{result.get('total_amount', 'N/A')}",
-                        progress=35,
-                        details={
-                            'merchant': result.get('merchant_name'),
-                            'amount': result.get('total_amount'),
-                            'items_count': len(result.get('items', [])),
-                            'confidence': result.get('confidence')
-                        }
-                    )
-                
+                logger.info(f"✅ Gemini analysis complete - Confidence: {confidence}%, Anomalies: {len(visual_anomalies)}")
                 return result
                 
             except Exception as e:
-                error_msg = str(e)
+                logger.error(f"❌ Gemini attempt {attempt + 1} failed: {str(e)}")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2
+                else:
+                    logger.error(f"❌ All Gemini attempts failed")
+                    raise
+        
+        # Should never reach here
+        raise Exception("Gemini analysis failed after all retries")
                 
                 # Check if it's a quota/rate limit error
                 if '429' in error_msg or 'quota' in error_msg.lower() or 'rate limit' in error_msg.lower():
