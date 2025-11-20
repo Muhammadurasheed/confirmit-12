@@ -12,7 +12,7 @@ import { Shield, Zap, Lock, ArrowLeft, Download, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { useReceiptStore } from "@/store/receiptStore";
 import { useReceiptUpload } from "@/hooks/useReceiptUpload";
-import { useWebSocket } from "@/hooks/useWebSocket";
+import { useFirebaseReceiptProgress } from "@/hooks/useFirebaseReceiptProgress";
 import { UploadZone } from "@/components/features/receipt-scan/UploadZone";
 import { AnalysisProgress } from "@/components/features/receipt-scan/AnalysisProgress";
 import { ResultsDisplay } from "@/components/features/receipt-scan/ResultsDisplay";
@@ -78,32 +78,34 @@ const QuickScan = () => {
     }
   };
 
-  // WebSocket for real-time updates
-  useWebSocket({
+  // Firebase Real-time Progress Listener (CORRECT way - agents emit to Firebase)
+  useFirebaseReceiptProgress({
     receiptId: uploadedReceiptId || undefined,
     onProgress: (data) => {
-      console.log('📊 Progress received in QuickScan:', data);
-      updateProgress(data.progress || 0, data.status || 'Processing...');
-    },
-    onComplete: async (data) => {
-      console.log('✅ Analysis complete in QuickScan:', data);
-      console.log('📦 Full data structure:', JSON.stringify(data, null, 2));
+      console.log(`🔥 [${data.agent}] ${data.stage}: ${data.message}`);
       
-      // Extract analysis from nested structure: data.data.analysis
-      let analysisData;
-      if (data.data?.analysis) {
-        // WebSocket returns { data: { analysis: {...} } }
-        analysisData = data.data.analysis;
-        console.log('📊 Extracted from data.data.analysis');
-      } else if (data.analysis) {
-        // Fallback: { analysis: {...} }
-        analysisData = data.analysis;
-        console.log('📊 Extracted from data.analysis');
-      } else {
-        // Fallback: treat data as analysis
-        analysisData = data;
-        console.log('📊 Using data as analysis');
+      // Map agent stages to user-friendly messages
+      const statusMap: Record<string, string> = {
+        'ocr_started': 'ocr_started',
+        'ocr_complete': 'ocr_started',
+        'gemini_fallback': 'ocr_started',
+        'forensics_running': 'forensics_running',
+        'ela_analysis': 'forensics_running',
+        'pixel_analysis': 'forensics_running',
+        'template_matching': 'forensics_running',
+        'analysis_complete': 'analysis_complete',
+      };
+      
+      const mappedStatus = statusMap[data.stage] || 'processing';
+      updateProgress(data.progress || 0, mappedStatus, data.message);
+      
+      // Show toast for important milestones
+      if (data.stage === 'forensics_running' && data.details?.fraud_indicators) {
+        toast.info(`⚠️ ${data.details.fraud_indicators} fraud indicators detected`);
       }
+    },
+    onComplete: async (analysisData) => {
+      console.log('✅ Firebase analysis complete:', analysisData);
       
       console.log('📊 Final analysis data:', JSON.stringify(analysisData, null, 2));
       setResults(analysisData);
@@ -117,7 +119,7 @@ const QuickScan = () => {
       toast.success('Analysis complete!');
     },
     onError: (error) => {
-      console.error('❌ WebSocket error in QuickScan:', error);
+      console.error('❌ Firebase error in QuickScan:', error);
       toast.error(error.error || error.message || 'Analysis failed');
       useReceiptStore.getState().failAnalysis(error.error || error.message || 'Unknown error');
     },
