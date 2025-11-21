@@ -54,7 +54,8 @@ export interface ForensicDetails {
   authenticity_indicators?: string[]; // Authenticity markers
   forensic_progress?: any[]; // Detailed forensic analysis steps
   technical_details?: any; // ELA analysis, forensic data
-  heatmap?: number[][];
+  manipulation_detected?: boolean; // Whether manipulation was detected
+  heatmap?: number[][]; // ELA heatmap 32x32 grid
   suspicious_regions?: Array<{
     x: number;
     y: number;
@@ -67,6 +68,12 @@ export interface ForensicDetails {
   image_dimensions?: {
     width: number;
     height: number;
+  };
+  statistics?: {
+    mean_error: number;
+    max_error: number;
+    std_error: number;
+    bright_pixel_ratio: number;
   };
   mean_error?: number;
   max_error?: number;

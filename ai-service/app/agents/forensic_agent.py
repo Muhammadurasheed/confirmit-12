@@ -363,9 +363,9 @@ class EnhancedForensicAgent:
                     'bright_pixel_ratio': float(bright_pixels)
                 },
                 'suspicious_regions': suspicious_regions,
-                'heatmap': heatmap,
+                'heatmap': heatmap,  # 32x32 array of error values for visualization
                 'image_dimensions': {'width': w, 'height': h},
-                'pixel_diff': pixel_diff
+                'pixel_diff': pixel_diff  # Full pixel diff data
             }
             
         except Exception as e:

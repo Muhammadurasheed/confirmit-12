@@ -175,6 +175,13 @@ class ReceiptAnalysisOrchestrator:
                     "techniques_detected": agent_results.get("forensic", {}).get("techniques_detected", []),
                     "authenticity_indicators": agent_results.get("forensic", {}).get("authenticity_indicators", []),
                     "technical_details": agent_results.get("forensic", {}).get("technical_details", {}),
+                    # Flattened ELA data for easier frontend access
+                    "manipulation_detected": agent_results.get("forensic", {}).get("technical_details", {}).get("ela_analysis", {}).get("manipulation_detected", False),
+                    "heatmap": agent_results.get("forensic", {}).get("technical_details", {}).get("ela_analysis", {}).get("heatmap", []),
+                    "suspicious_regions": agent_results.get("forensic", {}).get("technical_details", {}).get("ela_analysis", {}).get("suspicious_regions", []),
+                    "image_dimensions": agent_results.get("forensic", {}).get("technical_details", {}).get("ela_analysis", {}).get("image_dimensions"),
+                    "statistics": agent_results.get("forensic", {}).get("technical_details", {}).get("ela_analysis", {}).get("statistics"),
+                    "pixel_diff": agent_results.get("forensic", {}).get("technical_details", {}).get("ela_analysis", {}).get("pixel_diff"),
                 },
                 "merchant": agent_results.get("reputation", {}).get("merchant"),
                 "agent_logs": agent_logs,  # Critical: Agent execution logs
