@@ -331,6 +331,7 @@ const QuickScan = () => {
                   message={`Receipt ID: ${currentReceipt?.receiptId || ''}`}
                   currentAgent={currentReceipt?.currentAgent}
                   agentDetails={currentReceipt?.agentDetails}
+                  receiptId={currentReceipt?.receiptId}
                 />
               </motion.div>
             )}
