@@ -57,9 +57,25 @@ export const useFirebaseReceiptProgress = ({
           const data = docSnapshot.data();
           console.log('🔥 Firebase update received:', data);
 
-          // Check for progress updates
-          if (data.current_progress) {
-            const progress: AgentProgress = data.current_progress;
+          // Check for progress updates (now using flat structure)
+          if (data.progress_agent && data.progress_stage) {
+            const progress: AgentProgress = {
+              agent: data.progress_agent,
+              stage: data.progress_stage,
+              message: data.progress_message || '',
+              progress: data.progress_percentage || 0,
+              timestamp: data.progress_timestamp || new Date().toISOString(),
+              details: {}
+            };
+            
+            // Extract detail fields (progress_detail_*)
+            Object.keys(data).forEach(key => {
+              if (key.startsWith('progress_detail_')) {
+                const detailKey = key.replace('progress_detail_', '');
+                progress.details![detailKey] = data[key];
+              }
+            });
+            
             console.log(`📊 [${progress.agent}] ${progress.message} (${progress.progress}%)`);
             callbacksRef.current.onProgress?.(progress);
           }

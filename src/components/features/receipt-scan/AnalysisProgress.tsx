@@ -1,3 +1,4 @@
+import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, Loader2, AlertCircle } from 'lucide-react';
 import { Card } from '@/components/ui/card';
@@ -10,6 +11,13 @@ interface AnalysisProgressProps {
   message: string;
   currentAgent?: string;
   agentDetails?: Record<string, any>;
+  receiptId?: string;
+}
+
+interface AgentStatus {
+  name: string;
+  status: 'pending' | 'running' | 'completed';
+  message?: string;
 }
 
 const agentConfig = {
@@ -32,7 +40,36 @@ const statusConfig = {
   failed: { label: 'Verification Failed', icon: AlertCircle, color: 'text-red-500' },
 };
 
-export const AnalysisProgress = ({ progress, status, message, currentAgent, agentDetails }: AnalysisProgressProps) => {
+export const AnalysisProgress = ({ progress, status, message, currentAgent, agentDetails, receiptId }: AnalysisProgressProps) => {
+  const [agentStatuses, setAgentStatuses] = React.useState<Record<string, AgentStatus>>({
+    vision: { name: 'Vision Agent', status: 'pending' },
+    forensic: { name: 'Forensic Agent', status: 'pending' },
+    metadata: { name: 'Metadata Agent', status: 'pending' },
+    reputation: { name: 'Reputation Agent', status: 'pending' },
+  });
+
+  // Update agent statuses based on current agent
+  React.useEffect(() => {
+    if (currentAgent) {
+      setAgentStatuses(prev => {
+        const updated = { ...prev };
+        // Mark all agents before current as completed
+        const agentOrder = ['vision', 'forensic', 'metadata', 'reputation'];
+        const currentIndex = agentOrder.indexOf(currentAgent);
+        
+        agentOrder.forEach((agent, index) => {
+          if (index < currentIndex) {
+            updated[agent] = { ...updated[agent], status: 'completed' };
+          } else if (agent === currentAgent) {
+            updated[agent] = { ...updated[agent], status: 'running', message: message };
+          }
+        });
+        
+        return updated;
+      });
+    }
+  }, [currentAgent, message]);
+
   const config = statusConfig[status as keyof typeof statusConfig] || {
     label: 'Processing',
     icon: Loader2,
@@ -134,7 +171,7 @@ export const AnalysisProgress = ({ progress, status, message, currentAgent, agen
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="pt-4 border-t space-y-2"
+              className="pt-4 border-t space-y-3"
             >
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -144,35 +181,62 @@ export const AnalysisProgress = ({ progress, status, message, currentAgent, agen
                     : 'Multi-agent AI system analyzing your receipt...'}
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="flex items-center gap-1">
-                  <div className={`h-1.5 w-1.5 rounded-full ${status === 'ocr_started' ? 'bg-blue-500 animate-pulse' : 'bg-blue-500/30'}`} />
-                  <span>Vision Agent</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className={`h-1.5 w-1.5 rounded-full ${isForensicActive ? 'bg-purple-500 animate-pulse' : 'bg-purple-500/30'}`} />
-                  <span>Forensic Agent</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className={`h-1.5 w-1.5 rounded-full bg-orange-500/30`} />
-                  <span>Metadata Agent</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className={`h-1.5 w-1.5 rounded-full bg-green-500/30`} />
-                  <span>Reputation Agent</span>
+              
+              {/* Real-time Agent Activity Log */}
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">🤖 AI Agents Activity:</p>
+                <div className="space-y-1.5">
+                  {Object.entries(agentStatuses).map(([key, agent]) => (
+                    <motion.div
+                      key={key}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className={`flex items-center gap-2 text-xs p-2 rounded ${
+                        agent.status === 'running' ? 'bg-primary/10 border border-primary/20' : 
+                        agent.status === 'completed' ? 'bg-green-500/10' : 'bg-muted/50'
+                      }`}
+                    >
+                      {agent.status === 'running' && (
+                        <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                      )}
+                      {agent.status === 'completed' && (
+                        <Check className="h-3 w-3 text-green-500" />
+                      )}
+                      {agent.status === 'pending' && (
+                        <div className="h-3 w-3 rounded-full border-2 border-muted-foreground/30" />
+                      )}
+                      <span className={`font-medium ${
+                        agent.status === 'running' ? 'text-primary' :
+                        agent.status === 'completed' ? 'text-green-600 dark:text-green-400' :
+                        'text-muted-foreground'
+                      }`}>
+                        {agent.name}
+                      </span>
+                      {agent.message && agent.status === 'running' && (
+                        <span className="text-muted-foreground ml-auto truncate max-w-[200px]">
+                          {agent.message}
+                        </span>
+                      )}
+                    </motion.div>
+                  ))}
                 </div>
               </div>
+              
               {isForensicActive && (
-                <div className="mt-3 p-2 bg-purple-500/10 rounded text-xs space-y-1">
-                  <p className="font-medium text-purple-700 dark:text-purple-300">
-                    🔍 Active Forensic Layers:
+                <div className="mt-3 p-3 bg-purple-500/10 border border-purple-500/20 rounded text-xs space-y-2">
+                  <p className="font-semibold text-purple-700 dark:text-purple-300 flex items-center gap-2">
+                    <span>🔬</span> Deep Forensic Analysis Active
                   </p>
-                  <ul className="space-y-0.5 text-muted-foreground pl-4">
-                    <li>• Pixel-level manipulation detection</li>
-                    <li>• Error Level Analysis (ELA)</li>
-                    <li>• Clone region detection</li>
-                    <li>• Template matching verification</li>
+                  <ul className="space-y-1 text-muted-foreground pl-4">
+                    <li>✓ Pixel-level manipulation detection</li>
+                    <li>✓ Error Level Analysis (ELA) heatmap</li>
+                    <li>✓ Clone region detection</li>
+                    <li>✓ Template matching verification</li>
+                    <li>✓ Metadata integrity checks</li>
                   </ul>
+                  <p className="text-xs text-purple-600 dark:text-purple-400 italic mt-2">
+                    Analyzing over 50 forensic markers...
+                  </p>
                 </div>
               )}
             </motion.div>

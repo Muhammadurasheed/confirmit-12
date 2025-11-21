@@ -90,22 +90,24 @@ class ProgressEmitter:
                     logger.warning(f"⚠️ Failed to sanitize details: {sanitize_error}, converting to string")
                     sanitized_details = {'raw': str(details)[:200]}  # Truncate for safety
             
-            progress_update = {
-                'agent': str(agent),
-                'stage': str(stage),
-                'message': str(message),
-                'progress': int(progress),
-                'timestamp': datetime.utcnow().isoformat(),
+            # Use flat structure for Firebase compatibility (no nested objects)
+            update_data = {
+                'progress_agent': str(agent),
+                'progress_stage': str(stage),
+                'progress_message': str(message),
+                'progress_percentage': int(progress),
+                'progress_timestamp': datetime.utcnow().isoformat(),
+                'last_updated': datetime.utcnow().isoformat(),
             }
             
+            # Add detail fields as flat top-level keys
             if sanitized_details:
-                progress_update['details'] = sanitized_details
+                for key, value in sanitized_details.items():
+                    # Convert to simple string to avoid nested object issues
+                    update_data[f'progress_detail_{key}'] = str(value) if not isinstance(value, (str, int, float, bool)) else value
             
-            # Update Firebase with latest progress
-            self.progress_ref.update({
-                'current_progress': progress_update,
-                'last_updated': datetime.utcnow().isoformat(),
-            })
+            # Update Firebase with flat structure
+            self.progress_ref.update(update_data)
             
             logger.info(f"📡 [{self.receipt_id}] {agent}: {message} ({progress}%)")
             
