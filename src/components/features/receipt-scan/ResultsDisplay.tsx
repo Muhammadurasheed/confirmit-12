@@ -1,14 +1,17 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { AlertTriangle, CheckCircle, XCircle, HelpCircle, Flag, Link as LinkIcon, Eye } from 'lucide-react';
+import { AlertTriangle, CheckCircle, XCircle, HelpCircle, Flag, Link as LinkIcon, Eye, FileText, Microscope, Store } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import TrustScoreGauge from '@/components/shared/TrustScoreGauge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { ReportFraudModal } from './ReportFraudModal';
 import { ForensicDetailsModal } from './ForensicDetailsModal';
 import { HederaAnchorModal } from './HederaAnchorModal';
+import { OCRTextDisplay } from './OCRTextDisplay';
+import { ELAHeatmapVisual } from './ELAHeatmapVisual';
 import HederaBadge from '@/components/shared/HederaBadge';
 
 interface ResultsDisplayProps {
@@ -217,87 +220,137 @@ export const ResultsDisplay = ({
         </Card>
       )}
 
-      {/* Forensic Details Accordion */}
-      <Accordion type="single" collapsible>
-        <AccordionItem value="forensics">
-          <AccordionTrigger className="text-base font-semibold">
-            🔬 Forensic Analysis Details
-          </AccordionTrigger>
-          <AccordionContent>
-            <Card className="p-6 space-y-6">
-              {/* Summary */}
-              {forensicDetails.forensic_summary && (
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <p className="text-sm font-medium mb-2">Forensic Summary:</p>
-                  <p className="text-sm text-muted-foreground">{forensicDetails.forensic_summary}</p>
-                </div>
-              )}
+      {/* Detailed Analysis Tabs */}
+      <Tabs defaultValue="ocr" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="ocr" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Extracted Text
+          </TabsTrigger>
+          <TabsTrigger value="forensics" className="flex items-center gap-2">
+            <Microscope className="h-4 w-4" />
+            Forensic Analysis
+          </TabsTrigger>
+          <TabsTrigger value="merchant" className="flex items-center gap-2">
+            <Store className="h-4 w-4" />
+            Merchant Info
+          </TabsTrigger>
+        </TabsList>
 
-              {/* Key Metrics */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">OCR Confidence</p>
-                  <p className="text-2xl font-bold">{safeForensicDetails.ocr_confidence}%</p>
+        {/* OCR Tab */}
+        <TabsContent value="ocr" className="space-y-4 mt-6">
+          <OCRTextDisplay
+            ocrText={ocrText || ''}
+            confidence={safeForensicDetails.ocr_confidence}
+            merchant={merchant?.name}
+            amount={safeForensicDetails.technical_details?.vision_data?.total_amount}
+            date={safeForensicDetails.technical_details?.vision_data?.receipt_date}
+          />
+        </TabsContent>
+
+        {/* Forensics Tab */}
+        <TabsContent value="forensics" className="space-y-4 mt-6">
+          {/* ELA Heatmap Visualization */}
+          {safeForensicDetails.technical_details?.ela_analysis?.heatmap && (
+            <ELAHeatmapVisual
+              heatmap={safeForensicDetails.technical_details.ela_analysis.heatmap}
+              dimensions={safeForensicDetails.technical_details.ela_analysis.image_dimensions}
+              suspiciousRegions={safeForensicDetails.technical_details.ela_analysis.suspicious_regions}
+              manipulationDetected={safeForensicDetails.technical_details.ela_analysis.manipulation_detected}
+            />
+          )}
+
+          {/* Forensic Summary Card */}
+          <Card className="p-6 space-y-6">
+            {forensicDetails.forensic_summary && (
+              <div className="p-4 bg-muted/50 rounded-lg">
+                <p className="text-sm font-medium mb-2">Forensic Summary:</p>
+                <p className="text-sm text-muted-foreground">{forensicDetails.forensic_summary}</p>
+              </div>
+            )}
+
+            {/* Key Metrics */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground">OCR Confidence</p>
+                <p className="text-2xl font-bold">{safeForensicDetails.ocr_confidence}%</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Manipulation Score</p>
+                <p className="text-2xl font-bold">{safeForensicDetails.manipulation_score}%</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Suspicious Regions</p>
+                <p className="text-2xl font-bold">
+                  {safeForensicDetails.technical_details?.ela_analysis?.suspicious_regions?.length || 0}
+                </p>
+              </div>
+            </div>
+
+            {/* Authenticity Indicators */}
+            {forensicDetails.authenticity_indicators && forensicDetails.authenticity_indicators.length > 0 && (
+              <div>
+                <p className="text-sm font-medium mb-3 text-green-600 dark:text-green-400">
+                  ✓ Authenticity Indicators:
+                </p>
+                <ul className="space-y-2">
+                  {forensicDetails.authenticity_indicators.map((indicator, index) => (
+                    <li key={index} className="text-sm text-muted-foreground flex items-start gap-2">
+                      <span className="text-green-500 mt-0.5">✓</span>
+                      <span>{indicator}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Red Flags */}
+            {forensicDetails.techniques_detected && forensicDetails.techniques_detected.length > 0 && (
+              <div>
+                <p className="text-sm font-medium mb-3 text-red-600 dark:text-red-400">
+                  ⚠ Red Flags Detected:
+                </p>
+                <ul className="space-y-2">
+                  {forensicDetails.techniques_detected.map((technique, index) => (
+                    <li key={index} className="text-sm text-muted-foreground flex items-start gap-2">
+                      <span className="text-red-500 mt-0.5">⚠</span>
+                      <span>{technique}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </Card>
+        </TabsContent>
+
+        {/* Merchant Tab */}
+        <TabsContent value="merchant" className="space-y-4 mt-6">
+          {merchant ? (
+            <Card className="p-6">
+              <div className="space-y-6">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="text-2xl font-bold mb-2">{merchant.name}</h3>
+                    <Badge variant={merchant.verified ? "default" : "secondary"} className="gap-1">
+                      {merchant.verified && <CheckCircle className="h-3 w-3" />}
+                      {merchant.verified ? 'Verified Merchant' : 'Unverified'}
+                    </Badge>
+                  </div>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Manipulation Score</p>
-                  <p className="text-2xl font-bold">{safeForensicDetails.manipulation_score}%</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Metadata Flags</p>
-                  <p className="text-2xl font-bold">{safeMetadataFlags.length}</p>
+                  <p className="text-sm text-muted-foreground mb-3">Merchant Trust Score</p>
+                  <TrustScoreGauge score={merchant.trust_score} size="sm" />
                 </div>
               </div>
-
-              {/* Authenticity Indicators */}
-              {forensicDetails.authenticity_indicators && forensicDetails.authenticity_indicators.length > 0 && (
-                <div>
-                  <p className="text-sm font-medium mb-3 text-green-600 dark:text-green-400">
-                    ✓ Authenticity Indicators:
-                  </p>
-                  <ul className="space-y-2">
-                    {forensicDetails.authenticity_indicators.map((indicator, index) => (
-                      <li key={index} className="text-sm text-muted-foreground flex items-start gap-2">
-                        <span className="text-green-500 mt-0.5">✓</span>
-                        <span>{indicator}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Red Flags */}
-              {forensicDetails.techniques_detected && forensicDetails.techniques_detected.length > 0 && (
-                <div>
-                  <p className="text-sm font-medium mb-3 text-red-600 dark:text-red-400">
-                    ⚠ Red Flags Detected:
-                  </p>
-                  <ul className="space-y-2">
-                    {forensicDetails.techniques_detected.map((technique, index) => (
-                      <li key={index} className="text-sm text-muted-foreground flex items-start gap-2">
-                        <span className="text-red-500 mt-0.5">⚠</span>
-                        <span>{technique}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Metadata Findings */}
-              {safeMetadataFlags.length > 0 && (
-                <div>
-                  <p className="text-sm font-medium mb-2">Metadata Findings:</p>
-                  <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-                    {safeMetadataFlags.map((flag, index) => (
-                      <li key={index}>{flag}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
             </Card>
-          </AccordionContent>
-        </AccordionItem>
-      </Accordion>
+          ) : (
+            <Card className="p-12 text-center">
+              <Store className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+              <p className="text-muted-foreground">No merchant information available</p>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
 
       {/* Quick Actions */}
       <Card className="p-4">
