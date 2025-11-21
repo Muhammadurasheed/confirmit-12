@@ -202,7 +202,7 @@ class VisionAgent:
         """Extract phone numbers"""
         return re.findall(r'\b(?:\+234|0)\d{10}\b', text)
 
-    async def _analyze_with_gemini(self, img: Image, image_path: str, progress=None) -> Dict[str, Any]:
+    async def _analyze_with_gemini(self, img: Image, progress=None) -> Dict[str, Any]:
         """Enhanced Gemini Vision API with forensic fraud detection"""
         max_retries = 3
         retry_delay = 1

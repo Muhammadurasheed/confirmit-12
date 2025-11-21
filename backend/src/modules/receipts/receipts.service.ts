@@ -137,6 +137,7 @@ export class ReceiptsService {
 
       // Store complete results with ALL data from AI service
       await receiptRef.update({
+        ocr_text: analysisResult.ocr_text || '',  // CRITICAL: Store OCR text at root level
         analysis: {
           trust_score: analysisResult.trust_score,
           verdict: analysisResult.verdict,
@@ -151,10 +152,20 @@ export class ReceiptsService {
             authenticity_indicators: analysisResult.forensic_details?.authenticity_indicators || [],
             forensic_progress: analysisResult.forensic_details?.forensic_progress || [],
             technical_details: analysisResult.forensic_details?.technical_details || {},
+            heatmap: analysisResult.forensic_details?.heatmap || [],  // ELA heatmap data
+            pixel_diff: analysisResult.forensic_details?.pixel_diff || null,  // Pixel diff map
+            ela_analysis: {
+              manipulation_detected: analysisResult.forensic_details?.manipulation_detected || false,
+              heatmap: analysisResult.forensic_details?.heatmap || [],
+              suspicious_regions: analysisResult.forensic_details?.suspicious_regions || [],
+              image_dimensions: analysisResult.forensic_details?.image_dimensions,
+              statistics: analysisResult.forensic_details?.statistics,
+              techniques: analysisResult.forensic_details?.techniques_detected || [],
+              pixel_diff: analysisResult.forensic_details?.pixel_diff || null,
+            },
           },
           merchant: analysisResult.merchant || null,
           agent_logs: analysisResult.agent_logs || [],
-          ocr_text: analysisResult.ocr_text || null, // Include OCR text
         },
         processing_time: Date.now() - startTime,
         status: 'completed',
